@@ -36,11 +36,11 @@
 
 // To reuse this sample code for the MDL SDK and MDL Core the corresponding namespaces are used.
 
-// when this CUDA code is used in the context of an SDK sample.
+// when this CUDA code is used in the context of an SDK example.
 #if defined(MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR
     using namespace mi::neuraylib;
-// when this CUDA code is used in the context of an Core sample.
+// when this CUDA code is used in the context of an Core example.
 #elif defined(MDL_CORE_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MDL_CORE_BSDF_USE_MATERIAL_IOR
     using namespace mi::mdl;
@@ -55,7 +55,7 @@
 #define DF_HSM_FIXED_2  2
 #define DF_HSM_FIXED_4  4
 #define DF_HSM_FIXED_8  8
-// this is the one that is used, 
+// this is the one that is used,
 // Note, this has to match with code backend option "df_handle_slot_mode"
 #define DF_HANDLE_SLOTS DF_HSM_POINTER
 
@@ -442,7 +442,7 @@ struct auxiliary_data
 {
     float3 albedo;
     float3 normal;
-    int num; // multiple elements can contribute to the aux buffer with equal weight 
+    int num; // multiple elements can contribute to the aux buffer with equal weight
 
     __device__ inline auxiliary_data& operator+=(const auxiliary_data& b)
     {

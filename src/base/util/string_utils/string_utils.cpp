@@ -178,7 +178,7 @@ string to_upper(
 }
 
 // Note further code copies in mdl/compiler/compilercore/compilercore_wchar_support.cpp and in
-// prod/mdl_examples/mdl_sdk/shared/utils/strings.h
+// prod/mdl_examples/mdl_sdk/shared/utils/sdk_strings.h
 string wchar_to_utf8(const wchar_t *src)
 {
     string res;
@@ -258,7 +258,7 @@ namespace {
 // Converts one utf8 character to a utf32 encoded unicode character.
 //
 // Note further code copies in mdl/compiler/compilercore/compilercore_wchar_support.cpp and in
-// prod/mdl_examples/mdl_sdk/shared/utils/strings.h
+// prod/mdl_examples/mdl_sdk/shared/utils/sdk_strings.h
 char const *utf8_to_unicode_char(char const *up, unsigned &res)
 {
     bool error = false;

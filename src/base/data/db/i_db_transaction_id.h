@@ -47,8 +47,6 @@ namespace DB {
 /// \note These comparison operators do \em not implement a strict total ordering. Standard library
 ///       containers for Transaction_id require an explicit (different) key comparison function.
 ///
-/// TODO: It would be better to skip ID 0 on initialization and wrap-around since some parts of the
-/// code base use ID 0 for an invalid/unavailable transaction ID.
 class Transaction_id
 {
 public:
@@ -195,3 +193,4 @@ inline bool operator>=( const Transaction_id& lhs, const Transaction_id& rhs)
 } /// namespace MI
 
 #endif /// BASE_DATA_DB_I_DB_TRANSACTION_ID_H
+

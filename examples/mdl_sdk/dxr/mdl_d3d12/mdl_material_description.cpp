@@ -2075,57 +2075,56 @@ bool Mdl_material_description::load_material_definition_loader(
     m_module_db_names[0] = module_db_name->get_c_str();
 
     // dump the mdl for debugging only
-    if (!loader->get_options().generated_mdl_path.empty())
+    std::string output_path;
+    if (!loader->get_options().dump_mdl_path.empty())
     {
         // if the specified path points to an .mdl file, use it
         // otherwise assume that it is a folder path to be used with generated names
-        std::string output_path = loader->get_options().generated_mdl_path;
-        bool skip = false;
-        if (!mi::examples::strings::ends_with(output_path, ".mdl"))
+        output_path = loader->get_options().dump_mdl_path;
+
+        // allow placeholder <NAME> in the output path to handle multiple materials 
+        std::string material_name = mi::examples::strings::replace(function_name, '/', '_');
+        output_path = mi::examples::strings::replace(output_path, "<NAME>", material_name);
+
+        // make absolute and create folders if needed
+        output_path = mi::examples::io::is_absolute_path(output_path)
+            ? output_path : mi::examples::io::get_working_directory() + "/" + output_path;
+        std::string output_path_parent = mi::examples::strings::ends_with(output_path, ".mdl") 
+            ? mi::examples::io::dirname(output_path) : output_path;
+        bool skip_mdl_dump = false;
+        if (mi::examples::io::file_exists(output_path_parent))
         {
-            if (mi::examples::io::file_exists(output_path))
-            {
-                log_warning("Writing out generated file skipped. Specified path points to "
-                    "an existing file that is not an mdl: " + output_path);
-                skip = true;
-            }
-            else
-            {
-                if (!mi::examples::io::mkdir(output_path, true))
-                {
-                    log_warning("Writing out generated file skipped. "
-                        "Specified path can not be created: " + output_path);
-                    skip = true;
-                }
-                else
-                {
-                    std::string mtlx_material_file = mi::examples::io::is_absolute_path(gltf_name)
-                        ? gltf_name
-                        : scene_directory + "/" + gltf_name;
-
-                    // drop the query from the file name
-                    size_t pos = mtlx_material_file.find_first_of('?');
-                    mtlx_material_file = mtlx_material_file.substr(0, pos);
-
-                    std::string basename = mi::examples::io::basename(mtlx_material_file, false);
-                    std::string material_name = mi::examples::strings::replace(function_name, '/', '_');
-                    output_path = output_path + "/" + basename + "." + material_name + ".mdl";
-                }
-            }
+            log_warning("Writing out generated file skipped. "
+                "Parent path points to an existing file, not a folder: " + output_path_parent);
+            skip_mdl_dump = true;
+        }
+        else if (!mi::examples::io::mkdir(output_path_parent, true))
+        {
+            log_warning("Writing out generated file skipped. "
+                "Parent path can not be created: " + output_path_parent);
+            skip_mdl_dump = true;
+        }
+        else if (!mi::examples::strings::ends_with(output_path, ".mdl"))
+        {
+            // compute the module filename to use
+            output_path = output_path_parent + "/" + material_name + ".mdl";
         }
 
         // print the generated file
-        auto file = std::ofstream();
-        file.open(output_path, std::ofstream::out | std::ofstream::trunc);
-        if (file.is_open())
+        if (skip_mdl_dump)
         {
-            file << m_source_code;
-            file.close();
+            output_path = "";
         }
-
-        // export for better readability
-        std::string export_path = output_path.substr(0, output_path.length() - 4) + ".formated.mdl";
-        sdk.get_impexp_api().export_module(sdk.get_transaction().get(), module_db_name->get_c_str(), export_path.c_str());
+        else
+        {
+            auto file = std::ofstream();
+            file.open(output_path, std::ofstream::out | std::ofstream::trunc);
+            if (file.is_open())
+            {
+                file << m_source_code;
+                file.close();
+            }
+        }
     }
 
     // load the actual module, sequentially for now
@@ -2146,6 +2145,13 @@ bool Mdl_material_description::load_material_definition_loader(
     mi::base::Handle<const mi::neuraylib::IModule> module(
         sdk.get_transaction().access<const mi::neuraylib::IModule>(
             module_db_name->get_c_str()));
+
+    if (!output_path.empty())
+    {
+        // export again for better readability
+        std::string export_path = output_path.substr(0, output_path.length() - 4) + ".formatted.mdl";
+        sdk.get_impexp_api().export_module(sdk.get_transaction().get(), module_db_name->get_c_str(), export_path.c_str());
+    }
 
     if (module->get_material_count() == 0)
     {

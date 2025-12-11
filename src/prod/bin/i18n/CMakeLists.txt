@@ -36,7 +36,6 @@ set(PROJECT_HEADERS
     "errors.h"
     "logger.h"
     "options.h"
-    "neuray_factory.h"
     "search_path.h"
     "traversal.h"
     "util.h"
@@ -68,6 +67,12 @@ create_from_base_preset(
     SOURCES ${PROJECT_SOURCES}
 )
 
+# add include directory for utils/loading.cpp explicitly to avoid a dependency on the entire
+# mdl_sdk::shared target
+target_include_directories(
+    ${PROJECT_NAME}
+    PRIVATE ${MDL_EXAMPLES_FOLDER}/mdl_sdk/shared
+    )
 # add mdl and other dependencies
 target_add_dependencies(TARGET ${PROJECT_NAME}
     DEPENDS

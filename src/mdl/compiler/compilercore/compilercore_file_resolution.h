@@ -1036,7 +1036,7 @@ private:
 // ------------------------------------------------------------------------
 
 /// Implementation of the IMDL_import_result interface.
-class MDL_import_result : public Allocator_interface_implement<IMDL_import_result>
+class MDL_import_result MDL_FINAL : public Allocator_interface_implement<IMDL_import_result>
 {
     typedef Allocator_interface_implement<IMDL_import_result> Base;
     friend class Allocator_builder;
@@ -1064,6 +1064,9 @@ private:
         string const &abs_name,
         string const &os_file_name);
 
+    /// Destructor.
+    ~MDL_import_result() MDL_FINAL;
+
 private:
     /// The absolute MDL name of the import.
     string const m_abs_name;
@@ -1075,7 +1078,7 @@ private:
 // ------------------------------------------------------------------------
 
 /// Implementation of a resource reader from a file.
-class File_resource_reader : public Allocator_interface_implement<IMDL_resource_reader>
+class File_resource_reader MDL_FINAL : public Allocator_interface_implement<IMDL_resource_reader>
 {
     typedef Allocator_interface_implement<IMDL_resource_reader> Base;
 public:
@@ -1146,7 +1149,8 @@ private:
 //-------------------------------------------------------------------------------------------------
 
 /// Implementation of a resource reader from a file.
-class Buffered_archive_resource_reader : public Allocator_interface_implement<IMDL_resource_reader>
+class Buffered_archive_resource_reader MDL_FINAL :
+    public Allocator_interface_implement<IMDL_resource_reader>
 {
     typedef Allocator_interface_implement<IMDL_resource_reader> Base;
 public:

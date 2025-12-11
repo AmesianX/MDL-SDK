@@ -134,6 +134,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
             , window_width(1280)
             , window_height(720)
             , mdl_paths()
+            , no_mdl_std_path(false)
             , mdl_next(false)
             , use_class_compilation(true)
             , fold_all_bool_parameters(false)
@@ -176,6 +177,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
             , use_slang(false)
 #endif
 #if MDL_ENABLE_MATERIALX
+            , no_mtlx_std_path(false)
             , mtlx_to_mdl("latest")
             , materialxtest_mode(false)
 #endif
@@ -189,6 +191,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
         size_t window_width;
         size_t window_height;
         std::vector<std::string> mdl_paths;
+        bool no_mdl_std_path;
         bool mdl_next;
         bool use_class_compilation;
         bool fold_all_bool_parameters;
@@ -199,7 +202,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
         size_t ray_depth;
         size_t sss_depth;
         std::string output_file;
-        std::string generated_mdl_path;
+        std::string dump_mdl_path;
         std::vector<std::string> lpe;
         size_t iterations;
         bool enable_auxiliary;
@@ -237,6 +240,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
 #endif
 
 #if MDL_ENABLE_MATERIALX
+        bool no_mtlx_std_path;
         std::vector<std::string> mtlx_paths;
         std::vector<std::string> mtlx_libraries;
         std::string mtlx_to_mdl;

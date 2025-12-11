@@ -46,7 +46,7 @@ namespace glsl {
 /// equal and different otherwise.
 ///
 class Symbol {
-    friend class Arena_builder;
+    friend class mi::mdl::Arena_builder;
 
 public:
     ///

@@ -31,6 +31,7 @@
  // Simple Vulkan renderer using compiled BSDFs with a material parameter editor GUI.
 
 #include "example_shared.h"
+#include "example_materialx_shared.h"
 #include "example_vulkan_shared.h"
 
 #include <imgui.h>
@@ -40,6 +41,10 @@
 #include <numeric>
 #define _USE_MATH_DEFINES
 #include <math.h>
+
+#ifdef MDL_ENABLE_MATERIALX
+#include <MaterialXGenMdl/MdlShaderGenerator.h>
+#endif // MDL_ENABLE_MATERIALX
 
 static const VkFormat g_accumulation_texture_format = VK_FORMAT_R32G32B32A32_SFLOAT;
 
@@ -77,13 +82,18 @@ struct Options
     uint32_t samples_per_pixel = 4096;
     uint32_t samples_per_iteration = 8;
     uint32_t max_path_length = 4;
+    uint32_t max_sss_steps = 256;
     float cam_fov = 96.0f;
     mi::Float32_3 cam_pos = { 0.0f, 0.0f, 3.0f };
+    mi::Float32_3 cam_lookat = { 0.0f, 0.0f, 0.0f };
     mi::Float32_3 light_pos = { 10.0f, 0.0f, 5.0f };
     mi::Float32_3 light_intensity = { 1.0f, 0.95f, 0.9f };
     bool light_enabled = false;
     std::string hdr_file = "nvidia/sdk_examples/resources/environment.hdr";
     float hdr_intensity = 1.0f;
+    float hdr_rotate = 0.0f;
+    bool background_color_enabled = false;
+    mi::Float32_3 background_color = { 0.0f, 0.0f, 0.0f };
     bool use_class_compilation = true;
     uint32_t tex_results_cache_size = 16;
     bool enable_ro_segment = false;
@@ -92,11 +102,19 @@ struct Options
     std::string material_name = "::nvidia::sdk_examples::tutorials::example_df";
     bool enable_validation_layers = false;
     bool enable_shader_optimization = true;
+#ifdef MDL_ENABLE_MATERIALX
+    std::vector<std::string> mtlx_paths;
+    std::vector<std::string> mtlx_libraries;
+    mi::neuraylib::Mdl_version mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_LATEST;
+    std::string dump_mdl;
+#endif
+    bool materialxtest_mode = false;
     bool dump_glsl = false;
     bool hide_gui = false;
     bool enable_bsdf_flags = false;
     mi::neuraylib::Df_flags allowed_scatter_mode =
         mi::neuraylib::DF_FLAGS_ALLOW_REFLECT_AND_TRANSMIT;
+    bool nostdpath = false;
 };
 
 using Vulkan_texture = mi::examples::vk::Vulkan_texture;
@@ -173,7 +191,7 @@ Vulkan_texture create_material_texture(
     mi::base::Handle<const mi::neuraylib::ITexture> texture(
         transaction->access<mi::neuraylib::ITexture>(target_code->get_texture(texture_index)));
     mi::base::Handle<const mi::neuraylib::IImage> image(
-        transaction->access<mi::neuraylib::IImage>(texture->get_image())); 
+        transaction->access<mi::neuraylib::IImage>(texture->get_image()));
     mi::base::Handle<const mi::neuraylib::ICanvas> canvas(image->get_canvas(0, 0, 0));
     mi::Uint32 tex_width = canvas->get_resolution_x();
     mi::Uint32 tex_height = canvas->get_resolution_y();
@@ -336,14 +354,13 @@ class Df_vulkan_app : public mi::examples::vk::Vulkan_example_app
 public:
     Df_vulkan_app(
         mi::base::Handle<mi::neuraylib::ITransaction> transaction,
-        mi::base::Handle<mi::neuraylib::IMdl_impexp_api> mdl_impexp_api,
-        mi::base::Handle<mi::neuraylib::IImage_api> image_api,
+        mi::base::Handle<mi::neuraylib::INeuray> neuray,
         mi::base::Handle<const mi::neuraylib::ITarget_code> target_code,
         mi::base::Handle<const mi::neuraylib::ICompiled_material> compiled_material,
         mi::base::Handle<const mi::neuraylib::IAnnotation_list> material_parameter_annotations,
         mi::Size argument_block_index,
         const Options& options)
-    : Vulkan_example_app(mdl_impexp_api.get(), image_api.get())
+    : Vulkan_example_app(neuray.get())
     , m_transaction(transaction)
     , m_target_code(target_code)
     , m_compiled_material(compiled_material)
@@ -387,19 +404,31 @@ private:
 
     struct Render_params
     {
+        // Camera
         alignas(16) mi::Float32_3 cam_pos;
         alignas(16) mi::Float32_3 cam_dir;
         alignas(16) mi::Float32_3 cam_right;
         alignas(16) mi::Float32_3 cam_up;
         float cam_focal;
+
+        // Point light
         alignas(16) mi::Float32_3 point_light_pos;
         alignas(16) mi::Float32_3 point_light_color;
         float point_light_intensity;
+
+        // Environment
         float environment_intensity_factor;
         float environment_inv_integral;
+        float environment_rotation;
+        uint32_t background_color_enabled;
+        alignas(16) mi::Float32_3 background_color;
+
+        // Render params
         uint32_t max_path_length;
         uint32_t samples_per_iteration;
         uint32_t progressive_iteration;
+        uint32_t stretch_texcoord_u;
+        uint32_t flip_texcoord_v;
         uint32_t bsdf_data_flags;
     };
 
@@ -493,7 +522,7 @@ private:
     double m_last_stats_update;
     float m_render_time = 0.0f;
     bool m_vsync_enabled = true;
-    
+
     // Camera movement
     Camera_state m_camera_state;
     mi::Float32_2 m_mouse_start;
@@ -505,7 +534,7 @@ void Df_vulkan_app::init_resources()
     glslang::InitializeProcess();
 
     m_linear_sampler = mi::examples::vk::create_linear_sampler(m_device);
-    
+
     // Create the render resources for the material
     //
     // Create the storage buffer for the material's read-only data
@@ -599,6 +628,8 @@ void Df_vulkan_app::init_resources()
     m_render_params.progressive_iteration = 0;
     m_render_params.max_path_length = m_options.max_path_length;
     m_render_params.samples_per_iteration = m_options.samples_per_iteration;
+    m_render_params.stretch_texcoord_u = m_options.materialxtest_mode ? 1 : 0;
+    m_render_params.flip_texcoord_v = m_options.materialxtest_mode ? 1 : 0;
     m_render_params.bsdf_data_flags = m_options.allowed_scatter_mode;
 
     m_render_params.point_light_pos = m_options.light_pos;
@@ -608,16 +639,20 @@ void Df_vulkan_app::init_resources()
     m_render_params.point_light_color = m_render_params.point_light_intensity > 0.0f
         ? m_options.light_intensity / m_render_params.point_light_intensity
         : m_options.light_intensity;
+
     m_render_params.environment_intensity_factor = m_options.hdr_intensity;
+    m_render_params.environment_rotation = m_options.hdr_rotate;
+    m_render_params.background_color = m_options.background_color;
+    m_render_params.background_color_enabled = m_options.background_color_enabled ? 1 : 0;
 
     const float fov = m_options.cam_fov;
     const float to_radians = static_cast<float>(M_PI / 180.0);
     m_render_params.cam_focal = 1.0f / mi::math::tan(fov / 2.0f * to_radians);
 
     // Setup camera
-    const mi::Float32_3 camera_pos = m_options.cam_pos;
-    mi::Float32_3 inv_dir = camera_pos / mi::math::length(camera_pos);
-    m_camera_state.base_distance = mi::math::length(camera_pos);
+    mi::Float32_3 inv_dir = m_options.cam_pos - m_options.cam_lookat;
+    m_camera_state.base_distance = mi::math::length(inv_dir);
+    inv_dir /= m_camera_state.base_distance;
     m_camera_state.phi = mi::math::atan2(inv_dir.x, inv_dir.z);
     m_camera_state.theta = mi::math::acos(inv_dir.y);
     m_camera_state.zoom = 0;
@@ -871,7 +906,7 @@ void Df_vulkan_app::key_callback(int key, int action, int mods)
         if (key >= GLFW_KEY_1 && key <= GLFW_KEY_6)
             m_display_buffer_index = key - GLFW_KEY_1;
     }
-    
+
     ImGui_ImplGlfw_KeyCallback(m_window, key, glfwGetKeyScancode(key), action, mods);
 }
 
@@ -1159,9 +1194,7 @@ void Df_vulkan_app::update_camera_render_params(const Camera_state& cam_state)
     m_render_params.cam_up.z = -mi::math::cos(cam_state.phi) * mi::math::cos(cam_state.theta);
 
     const float dist = cam_state.base_distance * mi::math::pow(0.95f, cam_state.zoom);
-    m_render_params.cam_pos.x = -m_render_params.cam_dir.x * dist;
-    m_render_params.cam_pos.y = -m_render_params.cam_dir.y * dist;
-    m_render_params.cam_pos.z = -m_render_params.cam_dir.z * dist;
+    m_render_params.cam_pos = m_options.cam_lookat - m_render_params.cam_dir * dist;
 }
 
 void Df_vulkan_app::create_accumulation_images()
@@ -1226,17 +1259,23 @@ void Df_vulkan_app::create_accumulation_images()
             m_device, &image_view_create_info, nullptr, &accum_image.image_view));
     }
 }
-
 VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
 {
     std::string df_glsl_source = m_target_code->get_code();
 
-    std::string path_trace_shader_source = mi::examples::io::read_text_file(
-        mi::examples::io::get_executable_folder() + "/" + "path_trace.comp");
+    std::string path_trace_path
+        = mi::examples::mdl::find_shader_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "path_trace.comp");
+    if (path_trace_path.empty()) {
+        std::cerr << "Failed to find shader file path_trace.comp" << std::endl;
+        terminate();
+    }
+    std::string path_trace_shader_source
+        = mi::examples::io::read_text_file(path_trace_path);
 
     std::vector<std::string> defines;
     defines.push_back("LOCAL_SIZE_X=" + std::to_string(g_local_size_x));
     defines.push_back("LOCAL_SIZE_Y=" + std::to_string(g_local_size_y));
+    defines.push_back("MAX_SSS_STEPS=" + std::to_string(m_options.max_sss_steps));
 
     defines.push_back("BINDING_RENDER_PARAMS=" + std::to_string(g_binding_render_params));
     defines.push_back("BINDING_ENV_MAP=" + std::to_string(g_binding_environment_map));
@@ -1273,12 +1312,18 @@ VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
             defines.push_back("MDL_HAS_BACKFACE_EDF");
         else if (std::strcmp(fname, "mdl_backface_emission_intensity") == 0)
             defines.push_back("MDL_HAS_BACKFACE_EMISSION_INTENSITY");
+        else if (std::strcmp(fname, "mdl_volume_scattering_coefficient") == 0)
+            defines.push_back("MDL_HAS_VOLUME_SCATTERING");
+        else if (std::strcmp(fname, "mdl_volume_scattering_directional_bias") == 0)
+            defines.push_back("MDL_HAS_VOLUME_SCATTERING_DIRECTIONAL_BIAS");
+        else if (std::strcmp(fname, "mdl_volume_absorption_coefficient") == 0)
+            defines.push_back("MDL_HAS_VOLUME_ABSORPTION");
     }
 
     auto t0 = std::chrono::steady_clock::now();
     VkShaderModule shader_module = mi::examples::vk::create_shader_module_from_sources(
-        m_device, { df_glsl_source, path_trace_shader_source }, EShLangCompute,
-        defines, m_options.enable_shader_optimization);
+        m_device, { df_glsl_source, path_trace_shader_source }, MDL_EXAMPLE_RELATIVE_DIRECTORY,
+        EShLangCompute, defines, m_options.enable_shader_optimization);
     auto t1 = std::chrono::steady_clock::now();
     if (!m_path_trace_pipeline) // Print only the first time
         std::cout << "Compile GLSL to SPIR-V: " << std::chrono::duration<float>(t1 - t0).count() << "s\n";
@@ -1423,10 +1468,10 @@ void Df_vulkan_app::create_pipelines()
     { // Create display graphics pipeline
         VkShaderModule fullscreen_triangle_vertex_shader
             = mi::examples::vk::create_shader_module_from_file(
-                m_device, "display.vert", EShLangVertex, {}, m_options.enable_shader_optimization);
+                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.vert", EShLangVertex, {}, m_options.enable_shader_optimization);
         VkShaderModule display_fragment_shader
             = mi::examples::vk::create_shader_module_from_file(
-                m_device, "display.frag", EShLangFragment, {}, m_options.enable_shader_optimization);
+                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.frag", EShLangFragment, {}, m_options.enable_shader_optimization);
 
         m_display_pipeline = mi::examples::vk::create_fullscreen_triangle_graphics_pipeline(
             m_device, m_display_pipeline_layout, fullscreen_triangle_vertex_shader,
@@ -1755,7 +1800,7 @@ void Df_vulkan_app::create_descriptor_pool_and_sets()
         }
 
         // Material textures
-        // 
+        //
         // We rely on the partially bound bit when creating the descriptor set layout,
         // so we can leave holes in the descriptor sets (or leave them empty).
         // For each MDL texture index only one of the GLSL texture arrays is populated.
@@ -1928,7 +1973,11 @@ void Df_vulkan_app::write_accum_images_to_files()
         mi::base::Handle<mi::neuraylib::ITile> tile(canvas->get_tile());
         std::memcpy(tile->get_data(), pixels.data(), pixels.size());
         canvas = m_image_api->convert(canvas.get(), "Rgb_fp");
-        m_mdl_impexp_api->export_canvas(filename.c_str(), canvas.get());
+        mi::base::Handle option_force_default_gamma(m_factory->create<mi::IBoolean>());
+        option_force_default_gamma->set_value(true);
+        mi::base::Handle export_options(m_factory->create<mi::IMap>("Map<Interface>"));
+        export_options->insert("force_default_gamma", option_force_default_gamma.get());
+        m_mdl_impexp_api->export_canvas(filename.c_str(), canvas.get(), export_options.get());
     };
 
     uint32_t image_bpp = mi::examples::vk::get_image_format_bpp(g_accumulation_texture_format);
@@ -1971,27 +2020,16 @@ void Df_vulkan_app::write_accum_images_to_files()
 // MDL material compilation helpers
 //------------------------------------------------------------------------------
 mi::neuraylib::IFunction_call* create_material_instance(
-    mi::neuraylib::IMdl_impexp_api* mdl_impexp_api,
     mi::neuraylib::IMdl_factory* mdl_factory,
     mi::neuraylib::ITransaction* transaction,
-    mi::neuraylib::IMdl_execution_context* context,
-    const std::string& material_name,
+    const std::string& qualified_module_name,
+    const std::string& material_simple_name,
     mi::base::Handle<const mi::neuraylib::IAnnotation_list>& material_parameter_annotations)
 {
-    // Split material name into module and simple material name
-    std::string module_name, material_simple_name;
-    mi::examples::mdl::parse_cmd_argument_material_name(
-        material_name, module_name, material_simple_name);
-
-    // Load module
-    mdl_impexp_api->load_module(transaction, module_name.c_str(), context);
-    if (!print_messages(context))
-        exit_failure("Loading module '%s' failed.", module_name.c_str());
-
     // Get the database name for the module we loaded and check if
     // the module exists in the database.
     mi::base::Handle<const mi::IString> module_db_name(
-        mdl_factory->get_db_definition_name(module_name.c_str()));
+        mdl_factory->get_db_definition_name(qualified_module_name.c_str()));
     mi::base::Handle<const mi::neuraylib::IModule> module(
         transaction->access<mi::neuraylib::IModule>(module_db_name->get_c_str()));
     if (!module)
@@ -2091,6 +2129,56 @@ const mi::neuraylib::ITarget_code* generate_glsl_code(
     mi::base::Handle<mi::neuraylib::ILink_unit> link_unit(
         be_glsl->create_link_unit(transaction, context));
 
+     // Helper function to check if an expression exists in the compiled material
+    auto exists = [&compiled_material](const char* expression_path)
+    {
+        mi::base::Handle<const mi::neuraylib::IExpression> expr(
+            compiled_material->lookup_sub_expression(expression_path));
+        return expr.is_valid_interface();
+    };
+
+    // Helper function to check if a color function needs to be evaluated.
+    // Returns true if the expression value is constant black, otherwise false.
+    auto is_constant_black_color = [&compiled_material](const char* expression_path)
+    {
+        mi::base::Handle<const mi::neuraylib::IExpression> expr(
+            compiled_material->lookup_sub_expression(expression_path));
+        if (expr->get_kind() != mi::neuraylib::IExpression::EK_CONSTANT)
+            return false;
+
+        mi::base::Handle expr_constant(expr->get_interface<mi::neuraylib::IExpression_constant>());
+        mi::base::Handle value(expr_constant->get_value<mi::neuraylib::IValue_color>());
+        if (!value)
+            return false;
+
+        for (mi::Size i = 0; i < value->get_size(); ++i)
+        {
+            mi::base::Handle<const mi::neuraylib::IValue_float> element(value->get_value(i));
+            if (element->get_value() != 0.0f)
+                return false;
+        }
+        return true;
+    };
+
+    // Helper function to check if a float function needs to be evaluated.
+    // Returns true if the expression value is constant 0.0f, otherwise false.
+    auto is_constant_0f = [&compiled_material](const char* expression_path)
+    {
+        mi::base::Handle<const mi::neuraylib::IExpression> expr(
+            compiled_material->lookup_sub_expression(expression_path));
+        if (expr->get_kind() != mi::neuraylib::IExpression::EK_CONSTANT)
+            return false;
+
+        mi::base::Handle expr_constant(expr->get_interface<mi::neuraylib::IExpression_constant>());
+        mi::base::Handle value(expr_constant->get_value<mi::neuraylib::IValue_float>());
+        if (!value)
+            return false;
+
+        if (value->get_value() != 0.0f)
+            return false;
+        return true;
+    };
+
     // Specify which functions to generate
     std::vector<mi::neuraylib::Target_function_description> function_descs;
     function_descs.emplace_back("init", "mdl_init");
@@ -2098,8 +2186,17 @@ const mi::neuraylib::ITarget_code* generate_glsl_code(
     function_descs.emplace_back("surface.scattering", "mdl_bsdf");
     function_descs.emplace_back("surface.emission.emission", "mdl_edf");
     function_descs.emplace_back("surface.emission.intensity", "mdl_emission_intensity");
-    function_descs.emplace_back("volume.absorption_coefficient", "mdl_absorption_coefficient");
-    
+    if (!is_constant_black_color("volume.absorption_coefficient"))
+        function_descs.emplace_back(
+            "volume.absorption_coefficient", "mdl_volume_absorption_coefficient");
+    if (!is_constant_black_color("volume.scattering_coefficient"))
+        function_descs.emplace_back(
+            "volume.scattering_coefficient", "mdl_volume_scattering_coefficient");
+    if (   exists("volume.scattering.directional_bias")
+        && !is_constant_0f("volume.scattering.directional_bias"))
+        function_descs.emplace_back(
+            "volume.scattering.directional_bias", "mdl_volume_scattering_directional_bias");
+
     // Try to determine if the material is thin walled so we can check
     // if backface functions need to be generated.
     bool is_thin_walled_function = true;
@@ -2215,26 +2312,39 @@ const mi::neuraylib::ITarget_code* generate_glsl_code(
 void print_usage(char const* prog_name)
 {
     std::cout
-        << "Usage: " << prog_name << " [options] [<material_name|full_mdle_path>]\n"
+#ifdef MDL_ENABLE_MATERIALX
+        << "Usage: " << prog_name << " [options] [<material_name|absolute_mdle_path>|relative_mtlx_path]\n"
+#else
+        << "Usage: " << prog_name << " [options] [<material_name|absolute_mdle_path>]\n"
+#endif
         << "Options:\n"
         << "  -h|--help                   print this text and exit\n"
         << "  -v|--version                print the MDL SDK version string and exit\n"
-        << "  --nowin                     don't show interactive display\n"
+        << "  --no_window                 don't show interactive display\n"
         << "  --res <res_x> <res_y>       resolution (default: 1024x768)\n"
         << "  --numimg <n>                swapchain image count (default: 3)\n"
         << "  --device <id>               run on supported GPU <id>\n"
-        << "  -o|--output <outputfile>    image file to write result in nowin mode (default: output.exr)\n"
-        << "  --spp <num>                 samples per pixel, only used for --nowin (default: 4096)\n"
+        << "  -o|--output <outputfile>    image file to write result when --no_window is used\n"
+        << "                              (default: output.exr)\n"
+        << "  --spp <num>                 samples per pixel, only used for --no_window (default: 4096)\n"
         << "  --spi <num>                 samples per render loop iteration (default: 8)\n"
         << "  --max_path_length <num>     maximum path length (default: 4)\n"
+        << "  --max_sss_steps <num>       maximum number of volume scattering steps in addition to \n"
+        << "                              'max_path_length' (default: 256)\n"
         << "  -f|--fov <fov>              the camera field of view in degrees (default: 96.0)\n"
-        << "  --cam <x> <y> <z>           set the camera position (default: 0 0 3).\n"
-        << "                              The camera will always look towards (0, 0, 0)\n"
+        << "  --camera <px> <py> <pz> <fx> <fy> <fz>  overrides the camera pose defined in the\n"
+        << "                                          scene as well as the computed one if the\n"
+        << "                                          scene has no camera. Parameters specify\n"
+        << "                                          position and focus point (defaults:\n"
+        << "                                          0, 0, 3, 0, 0, 0).\n"
         << "  -l|--light <x> <y> <z>      adds an omnidirectional light with the given position\n"
         << "             <r> <g> <b>      and intensity\n"
         << "  --hdr <path>                hdr image file used for the environment map\n"
         << "                              (default: nvidia/sdk_examples/resources/environment.hdr)\n"
         << "  --hdr_intensity <value>     intensity of the environment map (default: 1.0)\n"
+        << "  --hdr_rotate <angle>        environment rotation in degree (default: 0)\n"
+        << "  --background <r> <g> <b>    constant background color to replace the environment only \n"
+        << "                              if directly visible to the camera. (default: <empty>).\n"
         << "  --nocc                      don't compile the material using class compilation\n"
         << "  --tex_res <num>             size of the texture results cache\n"
         << "  --enable_ro_segment         enable the read-only data segment\n"
@@ -2243,20 +2353,44 @@ void print_usage(char const* prog_name)
         << "                              generated code (requires read-only data segment or\n"
         << "                              ssbo, default 1024)\n"
         << "  -p|--mdl_path <path>        additional MDL search path, can occur multiple times\n"
+        << "  -n|--nostdpath              prevent adding the MDL system, user, and example search\n"
+        << "                              path(s) to the MDL search path\n"
+#ifdef MDL_ENABLE_MATERIALX
+        << "  --mtlx_path <path>          Specify an additional absolute search path location\n"
+        << "                              (e.g. '/projects/MaterialX'). This path will be queried\n"
+        << "                              when locating standard data libraries, XInclude\n"
+        << "                              references, and referenced images. Can occur multiple\n"
+        << "                              times.\n"
+        << "  --mtlx_library <rel_path>   Specify an additional relative path to a custom data\n"
+        << "                              library folder (e.g. 'libraries/custom'). MaterialX\n"
+        << "                              files at the root of this folder will be included in\n"
+        << "                              all content documents. Can occur multiple times.\n"
+        << "  --mtlx_to_mdl <version>     Specify the MDL version to generate.\n"
+        << "                              Supported values are \"1.6\" up to \"1.10\" and\n"
+        << "                              \"latest\". (default: \"latest\")\n"
+        << "  --dump_mdl <path>           outputs the MDL code generated from MaterialX to a file\n"
+#endif // MDL_ENABLE_MATERIALX
         << "  --vkdebug                   enable the Vulkan validation layers\n"
         << "  --no_shader_opt             disables shader SPIR-V optimization\n"
+        << "  --materialxtest_mode        setup image and texcoord space to match the test setup\n"
         << "  --dump_glsl                 outputs the generated GLSL target code to a file\n"
         << "  --hide_gui                  hide the settings gui. Can be toggled with SPACE\n"
         << "  --allowed_scatter_mode <m>  limits the allowed scatter mode to \"none\", \"reflect\",\n"
         << "                              \"transmit\" or \"reflect_and_transmit\"\n"
-        << "                              (default: restriction disabled)"
+        << "                              (default: restriction disabled)\n"
+        << "  --fatal, --error, --warning, --info, --verbose, --debug\n"
+        << "                              sets the log level accordingly (default: info)"
         << std::endl;
 
     exit(EXIT_FAILURE);
 }
 
-void parse_command_line(int argc, char* argv[], Options& options,
-    bool& print_version_and_exit, mi::examples::mdl::Configure_options& mdl_configure_options)
+void parse_command_line(
+    int argc,
+    char* argv[],
+    Options& options,
+    bool& print_version_and_exit,
+    mi::examples::mdl::Configure_options& mdl_configure_options)
 {
     for (int i = 1; i < argc; ++i)
     {
@@ -2265,7 +2399,7 @@ void parse_command_line(int argc, char* argv[], Options& options,
         {
             if (arg == "-v" || arg == "--version")
                 print_version_and_exit = true;
-            else if (arg == "--nowin")
+            else if (arg == "--no_window")
                 options.no_window = true;
             else if (arg == "--res" && i < argc - 2)
             {
@@ -2280,17 +2414,22 @@ void parse_command_line(int argc, char* argv[], Options& options,
                 options.output_file = argv[++i];
             else if (arg == "--spp" && i < argc - 1)
                 options.samples_per_pixel = std::atoi(argv[++i]);
+            else if (arg == "--max_sss_steps" && i < argc - 1)
+                options.max_sss_steps = std::atoi(argv[++i]);
             else if (arg == "--spi" && i < argc - 1)
                 options.samples_per_iteration = std::atoi(argv[++i]);
             else if (arg == "--max_path_length" && i < argc - 1)
                 options.max_path_length = std::atoi(argv[++i]);
             else if ((arg == "-f" || arg == "--fov") && i < argc - 1)
                 options.cam_fov = static_cast<float>(std::atof(argv[++i]));
-            else if (arg == "--cam" && i < argc - 3)
+            else if (arg == "--camera" && i < argc - 6)
             {
                 options.cam_pos.x = static_cast<float>(std::atof(argv[++i]));
                 options.cam_pos.y = static_cast<float>(std::atof(argv[++i]));
                 options.cam_pos.z = static_cast<float>(std::atof(argv[++i]));
+                options.cam_lookat.x = static_cast<float>(std::atof(argv[++i]));
+                options.cam_lookat.y = static_cast<float>(std::atof(argv[++i]));
+                options.cam_lookat.z = static_cast<float>(std::atof(argv[++i]));
             }
             else if ((arg == "-l" || arg == "--light") && i < argc - 6)
             {
@@ -2306,8 +2445,56 @@ void parse_command_line(int argc, char* argv[], Options& options,
                 options.hdr_file = argv[++i];
             else if (arg == "--hdr_intensity" && i < argc - 1)
                 options.hdr_intensity = static_cast<float>(std::atof(argv[++i]));
+            else if (arg == "--hdr_rotate" && i < argc - 1)
+                options.hdr_rotate
+                    = std::clamp(static_cast<float>(std::atof(argv[++i]))/360.0f, 0.0f, 1.0f);
+            else if (arg == "--background" && i < argc - 3)
+            {
+                options.background_color.x = static_cast<float>(std::atof(argv[++i]));
+                options.background_color.y = static_cast<float>(std::atof(argv[++i]));
+                options.background_color.z = static_cast<float>(std::atof(argv[++i]));
+                options.background_color_enabled = true;
+            }
             else if ((arg == "-p" || arg == "--mdl_path") && i < argc - 1)
                 mdl_configure_options.additional_mdl_paths.push_back(argv[++i]);
+            else if (arg == "-n" || arg == "--nostdpath")
+                options.nostdpath = true;
+#ifdef MDL_ENABLE_MATERIALX
+            else if (arg == "--mtlx_path" && i < argc - 1)
+            {
+                options.mtlx_paths.push_back(argv[++i]);
+            }
+            else if (arg == "--mtlx_library" && i < argc - 1)
+            {
+                options.mtlx_libraries.push_back(argv[++i]);
+            }
+            else if (arg == "--mtlx_to_mdl" && i < argc - 1)
+            {
+                std::string version(argv[++i]);
+                if (version == "1.6")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_1_6;
+                else if (version == "1.7")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_1_7;
+                else if (version == "1.8")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_1_8;
+                else if (version == "1.9")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_1_9;
+                else if (version == "1.10")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_1_10;
+                else if (version == "latest")
+                    options.mtlx_to_mdl_target_version = mi::neuraylib::MDL_VERSION_LATEST;
+                else
+                {
+                    std::cout << "Unsupported MDL target version: \"" << version << "\""
+                              << std::endl;
+                    print_usage(argv[0]);
+                }
+            }
+            else if (arg == "--dump_mdl" && i < argc - 1)
+            {
+                options.dump_mdl = argv[++i];
+            }
+#endif // MDL_ENABLE_MATERIALX
             else if (arg == "--nocc")
                 options.use_class_compilation = false;
             else if (arg == "--tex_res" && i < argc - 1)
@@ -2322,6 +2509,8 @@ void parse_command_line(int argc, char* argv[], Options& options,
                 options.enable_validation_layers = true;
             else if (arg == "--no_shader_opt")
                 options.enable_shader_optimization = false;
+            else if (arg == "--materialxtest_mode")
+                options.materialxtest_mode = true;
             else if (arg == "--dump_glsl")
                 options.dump_glsl = true;
             else if (arg == "--hide_gui")
@@ -2345,6 +2534,18 @@ void parse_command_line(int argc, char* argv[], Options& options,
                     print_usage(argv[0]);
                 }
             }
+            else if (arg == "--fatal")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_FATAL;
+            else if (arg == "--error")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_ERROR;
+            else if (arg == "--warning")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_WARNING;
+            else if (arg == "--info")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_INFO;
+            else if (arg == "--verbose")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_VERBOSE;
+            else if (arg == "--debug")
+                mdl_configure_options.log_level = mi::base::MESSAGE_SEVERITY_DEBUG;
             else
             {
                 if (arg != "-h" && arg != "--help")
@@ -2393,6 +2594,22 @@ int MAIN_UTF8(int argc, char* argv[])
     }
 
     // Configure the MDL SDK
+#ifdef MDL_ENABLE_MATERIALX
+    if (!options.nostdpath)
+    {
+        std::string mdl_search_path_for_materialx_support
+            = mi::examples::io::get_executable_folder() + "/materialx/mdl";
+        configure_options.additional_mdl_paths.push_back(mdl_search_path_for_materialx_support);
+    }
+    for (const auto& path: options.mtlx_paths)
+        configure_options.additional_mdl_paths.push_back(path);
+#endif
+    if (options.nostdpath)
+    {
+        configure_options.add_admin_space_search_paths = false;
+        configure_options.add_user_space_search_paths = false;
+        configure_options.add_example_search_path = false;
+    }
     if (!mi::examples::mdl::configure(neuray.get(), configure_options))
         exit_failure("Failed to initialize the SDK.");
 
@@ -2409,27 +2626,103 @@ int MAIN_UTF8(int argc, char* argv[])
         mi::base::Handle<mi::neuraylib::ITransaction> transaction(scope->create_transaction());
 
         // Access needed API components
-        mi::base::Handle<mi::neuraylib::IMdl_factory> mdl_factory(
+        mi::base::Handle mdl_configuration(
+            neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
+        mi::base::Handle mdl_factory(
             neuray->get_api_component<mi::neuraylib::IMdl_factory>());
-
-        mi::base::Handle<mi::neuraylib::IMdl_impexp_api> mdl_impexp_api(
+        mi::base::Handle mdl_impexp_api(
             neuray->get_api_component<mi::neuraylib::IMdl_impexp_api>());
-
-        mi::base::Handle<mi::neuraylib::IMdl_backend_api> mdl_backend_api(
+        mi::base::Handle mdl_backend_api(
             neuray->get_api_component<mi::neuraylib::IMdl_backend_api>());
-
-        mi::base::Handle<mi::neuraylib::IImage_api> image_api(
+        mi::base::Handle image_api(
             neuray->get_api_component<mi::neuraylib::IImage_api>());
 
         mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(
             mdl_factory->create_execution_context());
-        
+
         {
+            // DB module name of the MDL module
+            std::string qualified_module_name;
+            // Simple material name
+            std::string material_simple_name;
+
+#ifdef MDL_ENABLE_MATERIALX
+            // Check if the selected material is a MaterialX material
+            if (options.material_name.find(".mtlx") != std::string::npos)
+            {
+                // Set up MDL generator
+                mi::examples::materialx::Mdl_generator generator;
+                generator.set_mdl_version(options.mtlx_to_mdl_target_version);
+                generator.set_materialxtest_mode(options.materialxtest_mode);
+                for (const auto& p : options.mtlx_paths)
+                    generator.add_path(p);
+                for (const auto& l : options.mtlx_libraries)
+                    generator.add_library(l);
+
+                // Split "query" parameter from the MaterialX material name
+                std::string mtlx_filename = mi::examples::strings::drop_url_query(options.material_name);
+                std::string query = mi::examples::strings::get_url_query(options.material_name);
+                std::map<std::string, std::string> query_arguments
+                    = mi::examples::strings::parse_url_query(query);
+                auto it = query_arguments.find("name");
+                std::string mtlx_materialname = it == query_arguments.end() ? "" : it->second;
+                generator.set_source(mtlx_filename, mtlx_materialname);
+
+                mi::examples::materialx::Mdl_generator_result generated;
+                if (!generator.generate(mdl_configuration.get(), generated))
+                {
+                    print_message(mi::base::MESSAGE_SEVERITY_ERROR,
+                        "Failed to generate MDL code from: " + options.material_name);
+                    exit_failure();
+                }
+
+                qualified_module_name = "::app::generated";
+                material_simple_name = generated.generated_mdl_name;
+                const std::string& code = generated.generated_mdl_code;
+                if (mdl_impexp_api->load_module_from_string(
+                    transaction.get(), qualified_module_name.c_str(), code.c_str(), context.get()) < 0)
+                {
+                    print_message(mi::base::MESSAGE_SEVERITY_ERROR,
+                        "Failed to load the generated MDL code from: " + options.material_name);
+                    print_messages(context.get());
+                    exit_failure();
+                }
+
+                if (!options.dump_mdl.empty())
+                {
+                    print_message(mi::base::MESSAGE_SEVERITY_INFO,
+                        "Dumping generated MDL module to: " + options.dump_mdl);
+                    std::ofstream file_stream(options.dump_mdl);
+                    file_stream.write(code.c_str(), code.length());
+                }
+            }
+            else
+#endif // MDL_ENABLE_MATERIALX
+            {
+                // Split MDL material name into module and simple material name
+                mi::examples::mdl::parse_cmd_argument_material_name(
+                    options.material_name, qualified_module_name, material_simple_name);
+
+                // Load the module from the MDL search path
+                if (mdl_impexp_api->load_module(
+                    transaction.get(), qualified_module_name.c_str(), context.get()) < 0)
+                {
+                    print_message(mi::base::MESSAGE_SEVERITY_ERROR,
+                        "Failed to load material: " + options.material_name);
+                    print_messages(context.get());
+                    exit_failure();
+                }
+            }
+
             // Load and compile material, and generate GLSL code
             mi::base::Handle<const mi::neuraylib::IAnnotation_list> material_parameter_annotations;
             mi::base::Handle<mi::neuraylib::IFunction_call> material_instance(
-                create_material_instance(mdl_impexp_api.get(), mdl_factory.get(),
-                    transaction.get(), context.get(), options.material_name, material_parameter_annotations));
+                create_material_instance(
+                    mdl_factory.get(),
+                    transaction.get(),
+                    qualified_module_name,
+                    material_simple_name,
+                    material_parameter_annotations));
 
             mi::base::Handle<mi::neuraylib::ICompiled_material> compiled_material(
                 compile_material_instance(mdl_factory.get(), transaction.get(),
@@ -2460,7 +2753,7 @@ int MAIN_UTF8(int argc, char* argv[])
             app_config.enable_descriptor_indexing = true;
 
             Df_vulkan_app app(
-                transaction, mdl_impexp_api, image_api, target_code,
+                transaction, neuray, target_code,
                 compiled_material, material_parameter_annotations,
                 argument_block_index, options);
             app.run(app_config);

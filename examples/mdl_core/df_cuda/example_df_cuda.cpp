@@ -854,11 +854,9 @@ static void render_scene(
     CUfunction  cuda_function;
     char const *ptx_name = options.enable_derivatives ?
         "example_df_cuda_derivatives.ptx" : "example_df_cuda.ptx";
-    CUmodule    cuda_module = build_linked_kernel(
-        target_codes,
-        (get_executable_folder() + "/" + ptx_name).c_str(),
-        "render_sphere_kernel",
-        &cuda_function);
+    std::string ptx_filename = find_shader_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
+    CUmodule cuda_module = build_linked_kernel(
+        target_codes, ptx_filename.c_str(), "render_sphere_kernel", &cuda_function);
 
     // copy materials of the scene to the device
     CUdeviceptr material_buffer = 0;
@@ -1445,9 +1443,9 @@ Df_cuda_material create_cuda_material(
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1> ...]\n"
         << "-h                          print this text\n"
-        << "--nogl                      don't open interactive display\n"
+        << "--no_window                 don't open interactive display\n"
         << "--nocc                      don't use class-compilation\n"
         << "--gui_scale <factor>        GUI scaling factor (default: 1.0)\n"
         << "--res <res_x> <res_y>       resolution (default: 1024x1024)\n"
@@ -1456,7 +1454,7 @@ static void usage(const char *name)
         << "-o <outputfile>             image file to write result to (default: output.exr).\n"
         << "                            With multiple materials \"-<material index>\" will be\n"
         << "                            added in front of the extension\n"
-        << "--spp <num>                 samples per pixel, only active for --nogl (default: 4096)\n"
+        << "--spp <num>                 samples per pixel, only active for --no_window (default: 4096)\n"
         << "--spi <num>                 samples per render call (default: 8)\n"
         << "-t <type>                   0: eval, 1: sample, 2: mis, 3: mis + pdf, 4: no env\n"
         << "                            (default: 2)\n"
@@ -1481,14 +1479,14 @@ int MAIN_UTF8(int argc, char* argv[])
 {
     // Parse commandline options
     Options options;
-    options.mdl_paths.push_back(get_samples_mdl_root());
+    options.mdl_paths.push_back(get_examples_mdl_root());
 
     bool use_default_window_size = true;
 
     for (int i = 1; i < argc; ++i) {
         const char *opt = argv[i];
         if (opt[0] == '-') {
-            if (strcmp(opt, "--nogl") == 0) {
+            if (strcmp(opt, "--no_window") == 0) {
                 options.opengl = false;
             } else if (strcmp(opt, "--nocc") == 0) {
                 options.use_class_compilation = false;

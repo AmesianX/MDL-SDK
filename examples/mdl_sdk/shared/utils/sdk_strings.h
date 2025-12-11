@@ -26,7 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
- // examples/mdl_sdk/shared/utils/strings.h
+ // examples/mdl_sdk/shared/utils/sdk_strings.h
  //
  // Code shared by all examples
 

@@ -39,7 +39,7 @@ namespace mi {
 namespace mdl {
 
 /// Implementation of the IInput_stream interface using FILE I/O.
-class File_Input_stream : public Allocator_interface_implement<IInput_stream>
+class File_Input_stream MDL_FINAL : public Allocator_interface_implement<IInput_stream>
 {
     typedef Allocator_interface_implement<IInput_stream> Base;
 public:
@@ -129,7 +129,7 @@ private:
 };
 
 /// Implementation of the IInput_stream interface using an encrypted buffer.
-class Encoded_buffer_Input_stream : public Buffer_Input_stream
+class Encoded_buffer_Input_stream MDL_FINAL : public Buffer_Input_stream
 {
     typedef Buffer_Input_stream Base;
 public:
@@ -164,7 +164,7 @@ private:
 };
 
 /// Implementation of the IOutput_stream_colored interface using FILE I/O.
-class File_Output_stream : public Allocator_interface_implement<IOutput_stream_colored>
+class File_Output_stream MDL_FINAL : public Allocator_interface_implement<IOutput_stream_colored>
 {
     typedef Allocator_interface_implement<IOutput_stream_colored> Base;
 public:
@@ -212,7 +212,7 @@ private:
     File_Output_stream &operator=(File_Output_stream const &) MDL_DELETED_FUNCTION;
 
 private:
-    ~File_Output_stream();
+    ~File_Output_stream() MDL_FINAL;
 
 private:
     /// The file handle.
@@ -229,7 +229,7 @@ private:
 };
 
 /// Implementation of the IOutput_stream_colored interface for the debug output stream.
-class Debug_Output_stream : public Allocator_interface_implement<IOutput_stream>
+class Debug_Output_stream MDL_FINAL : public Allocator_interface_implement<IOutput_stream>
 {
     typedef Allocator_interface_implement<IOutput_stream> Base;
 public:
@@ -262,7 +262,7 @@ private:
     Debug_Output_stream &operator=(Debug_Output_stream const &) MDL_DELETED_FUNCTION;
 
 private:
-    ~Debug_Output_stream();
+    ~Debug_Output_stream() MDL_FINAL;
 
 private:
     /// The file handle.
@@ -270,7 +270,7 @@ private:
 };
 
 /// Implementation of the IOutput_stream interface using a growing buffer.
-class Buffer_output_stream : public Allocator_interface_implement<IOutput_stream>
+class Buffer_output_stream MDL_FINAL : public Allocator_interface_implement<IOutput_stream>
 {
     typedef Allocator_interface_implement<IOutput_stream> Base;
 public:
@@ -307,7 +307,7 @@ public:
     explicit Buffer_output_stream(IAllocator *alloc);
 
 private:
-    ~Buffer_output_stream();
+    ~Buffer_output_stream() MDL_FINAL;
 
 private:
     // non copyable

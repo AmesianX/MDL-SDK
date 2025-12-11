@@ -570,8 +570,9 @@ struct Options
             << "  --allowed_scatter_mode <m> limits the allowed scatter mode to \"none\", \"reflect\", "
             << "\"transmit\" or \"reflect_and_transmit\" (default: restriction disabled)\n"
             << "  -d                         enable use of derivatives\n"
-            << "  --nogui                    don't open interactive display\n"
-            << "  --spp                      samples per pixel (default: 100) for output image when nogui\n"
+            << "  --no_window                don't open interactive display\n"
+            << "  --spp                      samples per pixel (default: 100) for output image\n"
+            << "                             when --no_window is used\n"
             << "  -o <outputfile>            image file to write result to\n"
             << "                             (default: example_native.png)\n"
             << "  -p|--mdl_path <path>       mdl search path, can occur multiple times\n"
@@ -595,7 +596,7 @@ struct Options
             char const* opt = argv[i];
             if (opt[0] == '-')
             {
-                if (strcmp(opt, "--nogui") == 0)
+                if (strcmp(opt, "--no_window") == 0)
                 {
                     no_gui = true;
                 }
@@ -2043,7 +2044,7 @@ int MAIN_UTF8(int argc, char* argv[])
 {
     // Parse command line options
     Options options;
-    options.mdl_paths.push_back(get_samples_mdl_root());
+    options.mdl_paths.push_back(get_examples_mdl_root());
     options.parse(argc, argv);
 
     // Create render context
@@ -2414,7 +2415,7 @@ int MAIN_UTF8(int argc, char* argv[])
             ImGui::NewFrame();
 
             // Update material parameter editor window
-            bool changed = 
+            bool changed =
                 update_parmater_editor_window(mat_info, constant_table, options);
 
             // Handle key input events

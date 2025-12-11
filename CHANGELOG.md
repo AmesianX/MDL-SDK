@@ -1,6 +1,80 @@
 Change Log
 ==========
 
+MDL SDK 2025.0.3 (387700.2665): 10 Dec 2025
+-----------------------------------------------
+
+ABI compatible with the MDL SDK 2025.0.3 (387700.2665) binary release
+(see [https://developer.nvidia.com/mdl-sdk](https://developer.nvidia.com/mdl-sdk))
+
+**Added and Changed Features**
+
+- General
+  - Improved database garbage collection such that transactions in unrelated scopes
+	do not prevent a cleanup.
+	
+  - The recommended vcpkg version has been updated to git ID 30d7c16. This
+    update includes Boost 1.89.0, OpenImageIO 3.0.9.1, Vulkan SDK 1.4.309.0, and
+    various security fixes in their dependencies.
+	
+  - The recommended MaterialX version has been updated to 1.39.4.
+	
+  - Reduced compiler warnings on Windows.
+	
+- MDL Compiler and Backends
+  - Added compilation-context option "rerun_inlining" (off by default) to re-run inlining
+    at material compilation time. This might be beneficial in instance compilation mode to
+	inline (and fold) much more code, so analysis on code structure will find more properties.
+
+- MDL SDK examples	
+  - Multiple examples:
+    - Harmonized the name of some command-line options ("`--camera`" instead of
+      "`--cam`", "`--no_window`" instead of "`--nogl`", "`--nogui`", or "`--nowin`").
+    - Renamed environment variable `MDL_SAMPLES_ROOT` to `MDL_EXAMPLES_ROOT`.
+    - Added support for moving example binaries within the install directory,
+      e.g., to support the vcpkg layout.
+  
+  - Example df_vulkan:
+    - Added focal point to "`--camera`" command-line option.
+    - Added "`--fatal`", "`--error`", etc. command-line options to control the verbosity.
+    - Added support to generate MDL code from MaterialX files.
+    - Added support to use df_vulkan as test renderer for the MDL backend in MaterialX.
+    - Use the image export option "`force_default_gamma`" for easier comparison
+      with other backends in MaterialX.
+  
+  - Example DXR:
+    - Added options to disable default MDL and MaterialX search paths for improving the export
+	  of generated MDL from MaterialX for debugging purposes.
+    - The example now uses the static MSVC runtime (as all other examples). As
+      a consequence, the pre-built MaterialX libraries from their homepage are
+      no longer directly suitable. See also the documentation of the CMake
+      variable `MDL_MSVC_DYNAMIC_RUNTIME`.
+    - Dropped "`autodesk_`" prefix from build/install location for MaterialX support files.
+    - Replaced command-line options "`-g`" and "`--generated`" by "`--dump_mdl`".
+  
+  - Example distilling_unity:
+    - Replaced command-line option "`--verbosity`" by "`--fatal`", "`--error`", etc.
+	
+**Fixed Bugs**	
+
+- General
+  - Fixed a problem when Ninja is used as CMake generator on Windows.
+  
+  - Removed a few calls to `strlen()` to please static scanners.
+  
+- MDL Compiler and Backends
+  - Fixed position of token for qualified names starting with "{\tt ::}" and prefix operators
+    taken from the second token. This could lead to wrong error lines if for instance
+	the "{\tt ++}" operator and its operand are on different lines.
+	
+- MDL SDK examples
+  - Example DXR:
+    - Fixed endless loop for existing files when using "`--mdl_dump`".
+	  File names don't get an increasing suffix anymore.
+	  
+- MDL Distiller and Baker
+  - Improved distilling of OpenPBR materials with metalness = 1.
+
 MDL SDK 2025.0.0 (387700.1252): 04 Sep 2025
 -----------------------------------------------
 
@@ -64,9 +138,6 @@ ABI compatible with the MDL SDK 2025.0.0 (387700.1252) binary release
   - Also expose names of let expressions in material instances and lambda functions via
     `mi::mdl::DAG_unit`).
 
-  - Added support for MDL 1.10: the compiler accepts MDL 1.10, the internal representation is 1.10
-    now.
-
   - Implemented version promotion for default arguments: As default arguments are hidden to the
     user, they are now not only auto imported, but also version promoted. Especially entities that
     uses deprecated functions in its default arguments are not filtered out anymore, if  they can
@@ -91,7 +162,7 @@ ABI compatible with the MDL SDK 2025.0.0 (387700.1252) binary release
   - Fixed a crash in the compiler that occurred during the type construction if the error
     message for "`struct S { name name; }`" declaration was constructed.
 
-  - Fixed a crash in neuray/MDL SDK that occurred because a partial structure update
+  - Fixed a crash that occurred because a partial structure update
     did not generate all struct field access functions, although these are necessary in
     the DAG representation.
   
@@ -101,11 +172,32 @@ ABI compatible with the MDL SDK 2025.0.0 (387700.1252) binary release
 
   - Fixed declarative property of struct constructors, the declarative property of struct
     constructors must be inherited  from the struct type definition.
+	
+MDL SDK 2024.1.6 (381500.7597): 22 Sep 2025
+-----------------------------------------------
+
+ABI compatible with the MDL SDK 2024.1.6 (381500.7597) binary release
+(see [https://developer.nvidia.com/mdl-sdk](https://developer.nvidia.com/mdl-sdk))
+
+**Fixed Bugs**
+		  
+- General
+	- Removed unused package.json files which can cause false positives
+	  with some security scanners.
+
+- MDL Compiler and Backends
+  - Fixed a crash in the compiler that occurred during the type construction if the error
+    message for "`struct S { name name; }`" declaration was constructed.
+
+  - Fixed a crash that occurred because a partial structure update
+    did not generate all struct field access functions, although these are necessary in
+    the DAG representation.
+	
 
 MDL SDK 2024.1.4 (381500.6583): 01 Jul 2025
 -----------------------------------------------
 
-ABI compatible with the MDL SDK 2024.1.4 (3815006583) binary release
+ABI compatible with the MDL SDK 2024.1.4 (381500.6583) binary release
 (see [https://developer.nvidia.com/mdl-sdk](https://developer.nvidia.com/mdl-sdk))
 
 **Added and Changed Features**
@@ -978,7 +1070,7 @@ ABI compatible with the MDL SDK 2023.1.2 (373000.1755) binary release
 
 - General
     - `nvidia::core_definitions`: Fixed `'--'` in display names.
-    - Fixed type computation of ternary operator in MDL SDK/neuray.
+    - Fixed type computation of ternary operator.
     
 - MDL Compiler and Backends    
     - Fixed a rare crash that could happen in an MDL module imports other modules and

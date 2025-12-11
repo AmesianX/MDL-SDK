@@ -58,11 +58,13 @@ namespace DBLIGHT {
 Database_impl::Database_impl(
     THREAD_POOL::Thread_pool* thread_pool,
     SERIAL::Deserialization_manager* deserialization_manager,
-    bool enable_journal)
+    bool enable_journal,
+    mi::Uint32 initial_tag,
+    mi::Uint32 initial_transaction_id)
   : m_info_manager( new Info_manager( this)),
     m_scope_manager( new Scope_manager( this)),
-    m_transaction_manager( new Transaction_manager( this)),
-    m_next_tag( 1),
+    m_transaction_manager( new Transaction_manager( this, initial_transaction_id)),
+    m_next_tag( initial_tag),
     m_journal_enabled( enable_journal)
 {
     if( thread_pool) {
@@ -177,7 +179,7 @@ bool Database_impl::remove_scope( DB::Scope_id id)
 void Database_impl::garbage_collection( int priority)
 {
     THREAD::Block block( &m_lock);
-    m_info_manager->garbage_collection( m_transaction_manager->get_lowest_open_transaction_id());
+    m_info_manager->garbage_collection( /*update_lowest_open_transaction_ids*/ true);
 }
 
 void Database_impl::lock( mi::Uint32 lock_id)
@@ -441,9 +443,12 @@ void Database_impl::dump( std::ostream& s, bool verbose, bool mask_pointer_value
 DB::Database* factory(
     THREAD_POOL::Thread_pool* thread_pool,
     SERIAL::Deserialization_manager* deserialization_manager,
-    bool enable_journal)
+    bool enable_journal,
+    mi::Uint32 initial_tag,
+    mi::Uint32 initial_transaction_id)
 {
-    return new Database_impl( thread_pool, deserialization_manager, enable_journal);
+    return new Database_impl(
+        thread_pool, deserialization_manager, enable_journal, initial_tag, initial_transaction_id);
 }
 
 } // namespace DBLIGHT

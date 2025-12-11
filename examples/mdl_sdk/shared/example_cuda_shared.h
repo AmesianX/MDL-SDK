@@ -1605,12 +1605,7 @@ mi::neuraylib::IFunction_call* Material_compiler::create_material_instance(
         // material with given name does not exist
         print_message(
             mi::base::details::MESSAGE_SEVERITY_ERROR,
-            mi::neuraylib::IMessage::MSG_COMPILER_DAG,
-            (
-                "Material '" +
-                material_db_name +
-                "' does not exist in '" +
-                qualified_module_name + "'").c_str());
+            "Material '" + material_db_name + "' does not exist in '" + qualified_module_name + "'");
         return nullptr;
     }
 

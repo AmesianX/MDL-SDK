@@ -41,7 +41,6 @@ create_from_base_preset(
     OUTPUT_NAME "dependency_inspector"
     SOURCES ${PROJECT_SOURCES}
     EXAMPLE
-    STATIC_MSVC_RUNTIME
 )
 
 # add dependencies

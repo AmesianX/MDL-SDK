@@ -99,7 +99,7 @@ void Glsl_compiler::add_defines(const std::vector<std::string>& defines)
         const size_t equal_pos = define.find_first_of("=");
         if (equal_pos != define.npos)
             define[equal_pos] = ' ';
-        
+
         m_shader_preamble += "#define ";
         m_shader_preamble += define;
         m_shader_preamble += '\n';
@@ -167,10 +167,14 @@ std::vector<unsigned int> Glsl_compiler::link_program(bool optimize)
     {
         spvtools::OptimizerOptions opt_options;
         opt_options.set_run_validator(false);
+        // Workaround from https://github.com/KhronosGroup/SPIRV-Tools/issues/6260
+        opt_options.set_max_id_bound(99999999);
 
         std::vector<uint32_t> spirv_opt;
         spvtools::Optimizer optimizer(SPV_ENV_VULKAN_1_0);
         optimizer.RegisterPerformancePasses();
+        // Workaround from https://github.com/KhronosGroup/SPIRV-Tools/issues/6260
+        optimizer.RegisterPassFromFlag("--compact-ids");
         optimizer.Run(spirv.data(), spirv.size(), &spirv_opt, opt_options);
         return spirv_opt;
     }
@@ -191,12 +195,15 @@ glslang::TShader::Includer::IncludeResult* Glsl_compiler::Simple_file_includer::
     std::string filename(header_name);
 
     // Drop strict relative marker
-    if (mi::examples::strings::starts_with(filename, "./"))
+    if (strings::starts_with(filename, "./"))
         filename = filename.substr(2);
 
-    // Make path absolute if not already
-    if (!mi::examples::io::is_absolute_path(filename))
-        filename = mi::examples::io::get_executable_folder() + "/" + filename;
+    if (!io::is_absolute_path(filename)) {
+        std::string result = mi::examples::mdl::find_shader_file(
+            m_relative_directory.c_str(), filename.c_str());
+        if (!result.empty())
+            filename = result;
+    }
 
     std::ifstream file_stream(filename, std::ios_base::binary | std::ios_base::ate);
     if (!file_stream.is_open())
@@ -468,7 +475,7 @@ void Vulkan_example_app::cleanup()
     }
     else
         vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
- 
+
     for (uint32_t i = 0; i < m_image_count; i++)
     {
         vkDestroyFence(m_device, m_frame_inflight_fences[i], nullptr);
@@ -646,8 +653,9 @@ void Vulkan_example_app::pick_physical_device(
 
     if (supported_gpus.size() > 1)
     {
-        std::cout << "Multiple GPUs detected, run with option '--device <num>' to select specific one."
-            << " Defaults to the first discrete one:\n";
+        print_message(mi::base::MESSAGE_SEVERITY_INFO,
+            "Multiple GPUs detected, run with option '--device <num>' to select specific one. "
+            "Defaults to the first discrete one:");
 
         for (size_t i = 0; i < supported_gpus.size(); i++)
         {
@@ -658,36 +666,40 @@ void Vulkan_example_app::pick_physical_device(
             if (device_index == -1 && physical_device_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
                 device_index = static_cast<int32_t>(i);
 
-            std::cout << "  [" << i << "] " << physical_device_props.deviceName;
+            std::ostringstream s;
+            s << "  [" << i << "] " << physical_device_props.deviceName;
             switch (physical_device_props.deviceType)
             {
             case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-                std::cout << " [integrated]";
+                s << " [integrated]";
                 break;
             case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-                std::cout << " [discrete]";
+                s << " [discrete]";
                 break;
             case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-                std::cout << " [virtual]";
+                s << " [virtual]";
                 break;
             case VK_PHYSICAL_DEVICE_TYPE_CPU:
-                std::cout << " [cpu]";
+                s << " [cpu]";
                 break;
             default:
-                std::cout << " [unknown]";
+                s << " [unknown]";
                 break;
             }
-            std::cout << "\n";
+            print_message(mi::base::MESSAGE_SEVERITY_INFO, s.str());
         }
     }
-    
+
     if (m_config.device_index >= 0)
     {
         if (m_config.device_index < supported_gpus.size())
             device_index = m_config.device_index;
-        else
-            std::cout << "Requested device index " << m_config.device_index << " is out of bounds."
-                << "Falling back to the first discrete GPU.\n";
+        else {
+            std::ostringstream s;
+            s << "Requested device index " << m_config.device_index << " is out of bounds."
+              << "Falling back to the first discrete GPU.\n";
+            print_message(mi::base::MESSAGE_SEVERITY_WARNING, s.str());
+        }
     }
     else if (device_index == -1)
     {
@@ -703,8 +715,10 @@ void Vulkan_example_app::pick_physical_device(
     VkPhysicalDeviceProperties physical_device_props;
     vkGetPhysicalDeviceProperties(
         m_physical_device, &physical_device_props);
-    std::cout << "Chosen GPU: " << physical_device_props.deviceName
-        << " (driver version " << decode_driver_version(physical_device_props) << ")\n";
+    std::ostringstream s;
+    s << "Chosen GPU: " << physical_device_props.deviceName
+      << " (driver version " << decode_driver_version(physical_device_props) << ")";
+    print_message(mi::base::MESSAGE_SEVERITY_INFO, s.str());
 }
 
 void Vulkan_example_app::init_device(
@@ -943,7 +957,7 @@ void Vulkan_example_app::init_swapchain_for_headless()
             std::cerr << vkformat_to_str(m_config.preferred_image_formats[i]);
         }
         std::cerr << "} ";
-        
+
         if (m_image_format == VK_FORMAT_UNDEFINED)
         {
             std::cerr << " or default formats {";
@@ -956,7 +970,7 @@ void Vulkan_example_app::init_swapchain_for_headless()
             std::cerr << "} are supported.";
             terminate();
         }
-        
+
         std::cerr << " are supported. Choosing the first supported default format ("
             << vkformat_to_str(m_image_format) << ") instead.\n\n";
     }
@@ -979,7 +993,7 @@ void Vulkan_example_app::init_swapchain_for_headless()
     m_swapchain_images.resize(m_image_count);
     m_swapchain_device_memories.resize(m_image_count);
     m_swapchain_image_views.resize(m_image_count);
-    
+
     for (uint32_t i = 0; i < m_image_count; i++)
     {
         VkImageCreateInfo image_create_info = {};
@@ -1217,7 +1231,7 @@ void Vulkan_example_app::recreate_swapchain_or_framebuffer_image()
     init_framebuffers();
     init_command_pool_and_buffers();
     init_synchronization_objects();
-    
+
     recreate_size_dependent_resources();
 }
 
@@ -1249,7 +1263,7 @@ void Vulkan_example_app::render_loop_iteration(uint32_t frame_index, uint32_t im
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;
-    
+
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     if (!m_config.headless)
@@ -1298,7 +1312,7 @@ void Vulkan_example_app::internal_mouse_scroll_callback(
 void Vulkan_example_app::internal_resize_callback(GLFWwindow* window, int width, int height)
 {
     auto app = static_cast<Vulkan_example_app*>(glfwGetWindowUserPointer(window));
-    
+
     if (app->m_config.headless)
         app->recreate_swapchain_or_framebuffer_image();
 
@@ -1495,20 +1509,29 @@ bool check_validation_layers_support(
 }
 
 VkShaderModule create_shader_module_from_file(
-    VkDevice device, const char* shader_filename, EShLanguage shader_type,
+    VkDevice device,
+    const char* relative_directory,
+    const char* shader_filename,
+    EShLanguage shader_type,
     const std::vector<std::string>& defines, bool optimize)
 {
-    std::string shader_source = mi::examples::io::read_text_file(
-        mi::examples::io::get_executable_folder() + "/" + shader_filename);
+    std::string path = mdl::find_shader_file(relative_directory, shader_filename);
+    if (path.empty()) {
+        std::cerr << std::string("Failed to find shader file ") + shader_filename << std::endl;
+        terminate();
+    }
 
-    return create_shader_module_from_sources(device, { shader_source }, shader_type, defines, optimize);
+    std::string shader_source = io::read_text_file(path);
+    return create_shader_module_from_sources(
+        device, { shader_source }, relative_directory, shader_type, defines, optimize);
 }
 
 VkShaderModule create_shader_module_from_sources(
     VkDevice device, const std::vector<std::string_view> shader_sources,
-    EShLanguage shader_type, const std::vector<std::string>& defines, bool optimize)
+    const char* relative_directory, EShLanguage shader_type, const std::vector<std::string>& defines,
+    bool optimize)
 {
-    mi::examples::vk::Glsl_compiler glsl_compiler(shader_type, "main");
+    mi::examples::vk::Glsl_compiler glsl_compiler(relative_directory, shader_type, "main");
     glsl_compiler.add_defines(defines);
     for (const std::string_view& source : shader_sources)
         glsl_compiler.add_shader(source);
@@ -1789,7 +1812,7 @@ uint32_t get_image_format_bpp(VkFormat format)
     case VK_FORMAT_R64G64B64A64_SINT:
     case VK_FORMAT_R64G64B64A64_SFLOAT:
         return 32;
-    
+
     default:
         return 0;
     }
@@ -2088,7 +2111,7 @@ std::vector<uint8_t> copy_image_to_buffer(
         from_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         from_stage_mask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         break;
-    
+
     default:
         // TODO: add more specific cases as needed.
         from_access_mask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;

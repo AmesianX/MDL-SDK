@@ -48,7 +48,7 @@ endif()
 
 # headers
 if(NOT __TARGET_ADD_DEPENDENCY_NO_INCLUDE)
-    target_include_directories(${__TARGET_ADD_DEPENDENCY_TARGET} 
+    target_include_directories(${__TARGET_ADD_DEPENDENCY_TARGET}
         PRIVATE
             ${MDL_DEPENDENCY_MATERIALX_INCLUDE}
         )
@@ -56,8 +56,14 @@ endif()
 
 # static library
 if(NOT __TARGET_ADD_DEPENDENCY_NO_LINKING)
-    target_link_libraries(${__TARGET_ADD_DEPENDENCY_TARGET} 
+    target_link_libraries(${__TARGET_ADD_DEPENDENCY_TARGET}
         PRIVATE
             ${MDL_DEPENDENCY_MATERIALX_LIBS}
         )
 endif()
+
+# macro
+target_compile_definitions(${__TARGET_ADD_DEPENDENCY_TARGET}
+    PRIVATE
+        "MDL_ENABLE_MATERIALX"
+    )

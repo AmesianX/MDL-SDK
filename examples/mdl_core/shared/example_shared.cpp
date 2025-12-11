@@ -44,30 +44,33 @@ char sep()
 }
 
 /// Indicates whether that directory has a mdl/nvidia/sdk_examples subdirectory.
-bool is_samples_root(const std::string& path)
+bool is_examples_root(const std::string& path)
 {
     std::string subdirectory = path + sep() + "mdl" + sep() + "nvidia" + sep() + "sdk_examples";
     return dir_exists(subdirectory.c_str());
 }
 
-/// Intentionally not implemented inline which would require callers to define MDL_SAMPLES_ROOT.
-std::string get_samples_root()
+/// Intentionally not implemented inline which would require callers to define MDL_EXAMPLES_ROOT.
+std::string get_examples_root()
 {
-    std::string path = get_environment("MDL_SAMPLES_ROOT");
+    std::string path = get_environment("MDL_EXAMPLES_ROOT");
     if (!path.empty())
         return normalize_path(path);
 
 
     path = get_executable_folder();
     while (!path.empty()) {
-        if (is_samples_root(path))
+        if (is_examples_root(path))
             return normalize_path(path);
+        std::string candidate = path + sep() + "share/mdl-sdk/examples";
+        if (is_examples_root(candidate))
+            return normalize_path(candidate);
         path = dirname(path);
     }
 
-#ifdef MDL_SAMPLES_ROOT
-    path = MDL_SAMPLES_ROOT;
-    if (is_samples_root(path))
+#ifdef MDL_EXAMPLES_ROOT
+    path = MDL_EXAMPLES_ROOT;
+    if (is_examples_root(path))
         return normalize_path(path);
 #endif
 
@@ -125,4 +128,46 @@ std::string get_executable_folder()
         return "";
 
     return normalize_path(std::string(path, last_sep));
+}
+
+std::string read_text_file(const std::string& filename)
+{
+    std::ifstream file(filename.c_str());
+    if (!file.is_open())
+    {
+        fprintf(stderr, "Cannot open file : \"%s\".\n", filename.c_str());
+        return "";
+    }
+
+    std::stringstream string_stream;
+    string_stream << file.rdbuf();
+    return string_stream.str();
+}
+
+std::string find_shader_file(const char* relative_directory, const char* shader_filename)
+{
+    // Location for build/install targets (next to executable).
+    std::string executable_dirname = get_executable_folder();
+    std::string path = executable_dirname + "/" + shader_filename;
+    if (file_exists(path.c_str()))
+        return normalize_path(path.c_str());
+
+    // Location for examples as tools in vcpkg.
+    std::string examples_root = get_examples_root();
+    if (examples_root == ".")
+        return {};
+    path = examples_root + "/" + relative_directory + "/" + shader_filename;
+    if (file_exists(path.c_str()))
+        return normalize_path(path.c_str());
+
+    return {};
+}
+
+std::string read_shader_file(const char* relative_directory, const char* shader_filename)
+{
+    std::string filename = find_shader_file(relative_directory, shader_filename);
+    if (filename.empty())
+        return {};
+
+    return read_text_file(filename);
 }

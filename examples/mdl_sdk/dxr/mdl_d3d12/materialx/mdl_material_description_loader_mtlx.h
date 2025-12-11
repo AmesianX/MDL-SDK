@@ -66,8 +66,8 @@ namespace mi {namespace examples { namespace mdl_d3d12 { namespace materialx
     private:
         const Base_options& m_options;
         std::vector<std::string> m_paths;
+        bool m_add_mtlx_std_path;
         std::vector<std::string> m_libraries;
-        std::string m_generated_mdl_path;
         std::string m_mdl_version;
         bool m_materialxtest_mode;
     };

@@ -27,10 +27,15 @@
  *****************************************************************************/
 
 #include "mdl_material_description_loader_mtlx.h"
-#include "mdl_generator.h"
-#include "../base_application.h"
-#include <MaterialXCore/Unit.h>
+
 #include <algorithm>
+
+#include <MaterialXCore/Unit.h>
+
+#include "example_materialx_shared.h"
+
+#include "../base_application.h"
+#include "../mdl_sdk.h"
 
 namespace mi {namespace examples { namespace mdl_d3d12 { namespace materialx
 {
@@ -39,8 +44,8 @@ Mdl_material_description_loader_mtlx::Mdl_material_description_loader_mtlx(
     const Base_options& options)
     : m_options(options)
     , m_paths(options.mtlx_paths)
+    , m_add_mtlx_std_path(!options.no_mtlx_std_path)
     , m_libraries(options.mtlx_libraries)
-    , m_generated_mdl_path(options.generated_mdl_path)
     , m_mdl_version(options.mtlx_to_mdl)
     , m_materialxtest_mode(options.materialxtest_mode)
 {
@@ -64,8 +69,8 @@ bool Mdl_material_description_loader_mtlx::generate_mdl_source_code(
     std::string& out_generated_mdl_code,
     std::string& out_generated_mdl_name) const
 {
-    mdl_d3d12::materialx::Mdl_generator mtlx2mdl;
-    mdl_d3d12::materialx::Mdl_generator_result result;
+    mi::examples::materialx::Mdl_generator mtlx2mdl;
+    mi::examples::materialx::Mdl_generator_result result;
 
     // set the material file to load
     std::string mtlx_material_file = mi::examples::io::is_absolute_path(gltf_name)
@@ -89,6 +94,7 @@ bool Mdl_material_description_loader_mtlx::generate_mdl_source_code(
     }
 
     // allow to configure MaterialX search and library paths by the user
+    mtlx2mdl.set_add_std_path(m_add_mtlx_std_path);
     for (auto& p : m_paths)
         mtlx2mdl.add_path(p);
 
@@ -96,7 +102,20 @@ bool Mdl_material_description_loader_mtlx::generate_mdl_source_code(
         mtlx2mdl.add_library(l);
 
     // set the MDL language version
-    mtlx2mdl.set_mdl_version(m_mdl_version);
+    if (m_mdl_version == "1.6")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_1_6);
+    else if (m_mdl_version == "1.7")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_1_7);
+    else if (m_mdl_version == "1.8")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_1_8);
+    else if (m_mdl_version == "1.9")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_1_9);
+    else if (m_mdl_version == "1.10")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_1_10);
+    else if (m_mdl_version == "latest")
+        mtlx2mdl.set_mdl_version(mi::neuraylib::MDL_VERSION_LATEST);
+    else
+        log_warning("Ignoring unexpected MDL version \"" + m_mdl_version + "\"", SRC);
 
     // set MaterialXTest mode
     mtlx2mdl.set_materialxtest_mode(m_materialxtest_mode);
@@ -108,7 +127,7 @@ bool Mdl_material_description_loader_mtlx::generate_mdl_source_code(
     // generate the mdl code
     try
     {
-        valid &= mtlx2mdl.generate(mdl_sdk, result);
+        valid &= mtlx2mdl.generate(&mdl_sdk.get_config(), result);
     }
     catch (const std::exception & ex)
     {

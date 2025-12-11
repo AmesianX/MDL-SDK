@@ -938,6 +938,7 @@ Mdl_function_call::create_dag_material_instance(
     auto fold_transparent_layers = context->get_option<bool>(
         MDL_CTX_OPTION_FOLD_TRANSPARENT_LAYERS);
     auto ignore_noinline = context->get_option<bool>( MDL_CTX_OPTION_IGNORE_NOINLINE);
+    auto enable_inline = context->get_option<bool>( MDL_CTX_OPTION_RERUN_INLINING);
     auto target_material_model_mode = context->get_option<bool>(
         MDL_CTX_OPTION_TARGET_MATERIAL_MODEL_MODE);
     auto resolve_resources = context->get_option<bool>( MDL_CTX_OPTION_RESOLVE_RESOURCES);
@@ -1026,6 +1027,8 @@ Mdl_function_call::create_dag_material_instance(
     }
     if( ignore_noinline)
         flags |= mi::mdl::IMaterial_instance::IGNORE_NOINLINE;
+    if( enable_inline)
+        flags |= mi::mdl::IMaterial_instance::RERUN_INLINING;
     if( target_material_model_mode)
         flags |= mi::mdl::IMaterial_instance::TARGET_MATERIAL_MODEL;
 

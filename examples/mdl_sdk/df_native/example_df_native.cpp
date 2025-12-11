@@ -2566,9 +2566,9 @@ void usage(char const *prog_name)
         << "\"transmit\" or \"reflect_and_transmit\" (default: restriction disabled)\n"
         << "  --an                       use adapt normal function\n"
         << "  -d                         enable use of derivatives\n"
-        << "  --nogui                    don't open interactive display\n"
-        << "  --spp                      samples per pixel (default: 100) for output image when "
-           "nogui\n"
+        << "  --no_window                don't open interactive display\n"
+        << "  --spp                      samples per pixel (default: 100) for output image when\n"
+        << "                             --no_window is used\n"
         << "  -o <outputfile>            image file to write result to\n"
         << "                             (default: example_native.png)\n"
         << "  -oaux                      output albedo and normal auxiliary buffers\n"
@@ -2590,7 +2590,6 @@ int MAIN_UTF8(int argc, char *argv[])
     // Parse command line options
     Options options;
     mi::examples::mdl::Configure_options configure_options;
-    configure_options.add_example_search_path = false;
 
     bool print_version_and_exit = false;
 
@@ -2599,7 +2598,7 @@ int MAIN_UTF8(int argc, char *argv[])
         char const *opt = argv[i];
         if (opt[0] == '-')
         {
-            if (strcmp(opt, "--nogui") == 0)
+            if (strcmp(opt, "--no_window") == 0)
             {
                 options.no_gui = true;
             }
@@ -2715,8 +2714,6 @@ int MAIN_UTF8(int argc, char *argv[])
     Render_context rc(options.enable_derivatives);
 
     // Use default material, if none was provided via command line
-    configure_options.add_example_search_path = true;
-
     if (options.material_name.empty())
         options.material_name = "::nvidia::sdk_examples::tutorials::example_df";
 

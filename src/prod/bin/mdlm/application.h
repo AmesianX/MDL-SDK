@@ -30,15 +30,6 @@
 #include <mi/mdl_sdk.h>
 #include "options.h"
 
- /// Forward declarations.
-namespace mi 
-{
-    namespace neuraylib 
-    { 
-        class Neuray_factory;
-    }
-}
-
 namespace mdlm
 {
     class Command;
@@ -68,8 +59,8 @@ namespace mdlm
         Options m_options;
         Command * m_command;
         mi::base::Handle<mi::base::ILogger> m_logger;
+        mi::base::Handle<mi::neuraylib::INeuray> m_neuray;
         std::string m_name;
-        mi::neuraylib::Neuray_factory * m_factory;
         bool m_openimageio_loaded;
 
         Application(const Application&);//prevent copy ctor
@@ -99,10 +90,10 @@ namespace mdlm
         /// Shutdown neuray
         void shutdown();
 
-        /// Access neuray 
+        /// Access neuray
         mi::neuraylib::INeuray * neuray();
 
-        /// Access logger 
+        /// Access logger
         const mi::base::Handle<mi::base::ILogger> & logger();
 
         /// Return the command which the program should invoke

@@ -278,7 +278,7 @@ namespace mi { namespace examples { namespace gui
         float m_width;
         float m_min_width;
         float m_margins[4];
-        Gui_direction m_docking_direction;
+        Gui_direction m_docking_direction;  // unused yet
         std::unordered_map<std::string, Base_element*> m_elements;
     };
 

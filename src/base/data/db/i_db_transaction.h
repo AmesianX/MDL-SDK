@@ -132,7 +132,7 @@ public:
     virtual Transaction_id get_id() const = 0;
 
     /// Returns the scope of this transaction. RCS:NEU
-    virtual Scope* get_scope() = 0;
+    virtual Scope* get_scope() const = 0;
 
     /// Returns the sequence number for the next update within this transaction.
     ///
@@ -494,7 +494,7 @@ public:
 
     /// Looks up the tag for a name (within the context of this transaction, safe version).
     ///
-    /// This method differs from #name_to_tag() in the following way:
+    /// This method differs from name_to_tag_unsafe() in the following way:
     /// - (1) No difference if no tag is found for the given name.
     /// - (2) No difference if the found tag is not flagged for removal.
     /// - (3) If flagged for removal and (the reference count is equal to 0 and \p context
@@ -516,10 +516,10 @@ public:
     /// and to reference it again (or keep it referenced). The removal flag will carry over to a
     /// potentially new version of that database element.
     ///
-    /// \note There is no guarantee that name_to_tag() followed by tag_to_name() produces
+    /// \note There is no guarantee that #name_to_tag() followed by #tag_to_name() produces
     ///       the original name.
     ///
-    /// \see #name_to_tag()
+    /// \see #name_to_tag_unsafe()
     ///
     /// \param name      The name to look up.
     /// \param context   The context of the operation controls whether case (3) above is a feasible
@@ -530,7 +530,7 @@ public:
 
     /// Looks up the name of a tag (within the context of this transaction, unsafe version).
     ///
-    /// \note There is no guarantee that #tag_to_name_unsafe () followed by #name_to_tag() produces
+    /// \note There is no guarantee that #name_to_tag_unsafe () followed by #tag_to_name() produces
     ///       the original tag.
     ///
     /// \param tag   The tag to look up.

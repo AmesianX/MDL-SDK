@@ -121,7 +121,7 @@ int MAIN_UTF8(int argc, char *argv[])
 {
     // Collect command line parameters
     std::vector<std::string> mdl_paths;
-    mdl_paths.push_back(get_samples_mdl_root());
+    mdl_paths.push_back(get_examples_mdl_root());
 
     bool use_class_compilation = false;
     for (int i = 1; i < argc; ++i) {

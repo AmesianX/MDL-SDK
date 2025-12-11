@@ -91,7 +91,7 @@ public:
 
     void set_host_id( unsigned int host_id) override { m_host_id = host_id; }
 
-    void set_host_name( const char* host_name);
+    void set_host_name( const char* host_name) override;
 
     void insert_message(
             const char* mod, Category cat, Severity sev, const mi::base::Message_details&,

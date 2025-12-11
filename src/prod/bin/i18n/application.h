@@ -31,14 +31,6 @@
 #include "options.h"
 
  /// Forward declarations.
-namespace mi 
-{
-    namespace neuraylib 
-    { 
-        class Neuray_factory;
-    }
-}
-
 namespace i18n
 {
     class Command;
@@ -68,8 +60,8 @@ namespace i18n
         Options m_options;
         Command * m_command;
         mi::base::Handle<mi::base::ILogger> m_logger;
+        mi::base::Handle<mi::neuraylib::INeuray> m_neuray;
         std::string m_name;
-        mi::neuraylib::Neuray_factory * m_factory;
         Application(const Application&);//prevent copy ctor
         // Setup the application options from the command line arguments
         mi::Sint32 setup_options(int argc, char *argv[]);
@@ -97,10 +89,10 @@ namespace i18n
         /// Shutdown neuray
         void shutdown();
 
-        /// Access neuray 
+        /// Access neuray
         mi::neuraylib::INeuray * neuray();
 
-        /// Access logger 
+        /// Access logger
         const mi::base::Handle<mi::base::ILogger> & logger();
 
         /// Return the command which the program should invoke

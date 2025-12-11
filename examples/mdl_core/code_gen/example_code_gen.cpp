@@ -544,7 +544,7 @@ options:
 /// Parse command line options
 bool Options::parse(int argc, char* argv[])
 {
-    m_mdl_paths.push_back(get_samples_mdl_root());
+    m_mdl_paths.push_back(get_examples_mdl_root());
 
     for (int i = 1; i < argc; ++i)
     {

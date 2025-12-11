@@ -71,7 +71,6 @@ private:
     void set_located_in_archive(bool value);
     const char* get_file_path() const;
     void set_file_path(const char* search_path);
-    mutable bool m_located_in_archive;
 };
 
 #endif

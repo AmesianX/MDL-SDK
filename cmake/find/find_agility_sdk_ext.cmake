@@ -33,7 +33,7 @@
 
 function(FIND_AGILITY_SDK_EXT)
 
-    set(AGILITY_SDK_DIR "" CACHE PATH "Directory that contains the `include` and `bin` dir. When extracting the nuget package, it's the `build/native` subfolder.")
+    set(AGILITY_SDK_DIR "" CACHE PATH "Directory that contains the 'include' and 'bin' dir. When extracting the nuget package, it's the 'build/native' subfolder.")
     option(AGILITY_SDK_ENABLED "Enable the \"Microsoft Agility SDK\" for advanced D3D features." OFF)
 
     if(NOT AGILITY_SDK_ENABLED)

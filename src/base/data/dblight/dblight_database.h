@@ -107,10 +107,16 @@ public:
     ///                                  an independent deserialization manager.
     /// \param enable_journal            Indicates whether the enable the journal. Maintaining the
     ///                                  journal requires memory and time.
+    /// \param initial_tag               The first tag to allocate (configurable for testing
+    ///                                  purposes).
+    /// \param initial_transaction_id    The first transaction ID to allocate (configurable for
+    ///                                  testing purposes).
     Database_impl(
         THREAD_POOL::Thread_pool* thread_pool,
         SERIAL::Deserialization_manager* deserialization_manager,
-        bool enable_journal);
+        bool enable_journal,
+        mi::Uint32 initial_tag,
+        mi::Uint32 initial_transaction_id);
 
     /// Destructor, clears the database.
     virtual ~Database_impl();

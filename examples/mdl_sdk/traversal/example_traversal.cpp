@@ -200,7 +200,7 @@ int MAIN_UTF8(int argc, char* argv[])
                     tf->get_predefined_struct(mi::neuraylib::IType_struct::SID_MATERIAL));
                 context->set_option("target_type", standard_material_type.get());
             }
-            
+
 
             mi::base::Handle<const mi::neuraylib::ICompiled_material> compiled_material(
                 material_instance->create_compiled_material(
@@ -352,7 +352,7 @@ options:
 
   -h|--help                     Prints this usage message and exits.
   -p|--mdl_path <path>          Adds the given path to the MDL search path.
-  -n|--nostdpath                Prevents adding the MDL system and user search
+  -n|--nostdpath                Prevents adding the MDL system, user, and example search
                                 path(s) to the MDL search path.
   --class                       Use class compilation (Default).
   --instance                    Use instance mode instead of class compilation.

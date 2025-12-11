@@ -327,12 +327,15 @@ public:
 
     /// Try to inline the given call.
     ///
+    /// \param call         The DAG call of the call site.
     /// \param owner_dag    The owner code DAG of the definition to inline.
     /// \param def          The definition of the function to inline.
-    /// \param call         The DAG call expression to convert.
+    /// \param args         The arguments of the call (potentially modified).
+    /// \param n_args       The number of arguments.
     /// \returns            The DAG expression if the function call could be inlined,
     ///                     NULL otherwise.
     DAG_node const *try_inline(
+        DAG_call const                *call,
         IGenerated_code_dag const     *owner_dag,
         IDefinition const             *def,
         DAG_call::Call_argument const *args,

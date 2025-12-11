@@ -323,7 +323,7 @@ bool Mdl_material_target::add_material_to_link_unit(
     };
 
     // helper function to check if a color function needs to be evaluated
-    // returns true if the expression value is constant black, otherwise true
+    // returns true if the expression value is constant black, otherwise false
     auto is_constant_black_color = [&compiled_material](const char* expression_path)
     {
         // fetch the constant expression
@@ -351,7 +351,7 @@ bool Mdl_material_target::add_material_to_link_unit(
     };
 
     // helper function to check if a float function needs to be evaluated
-    // returns true if the expression value is constant 0.0f, otherwise true
+    // returns true if the expression value is constant 0.0f, otherwise false
     auto is_constant_0f = [&compiled_material](const char* expression_path)
         {
             // fetch the constant expression
@@ -373,7 +373,7 @@ bool Mdl_material_target::add_material_to_link_unit(
         };
 
     // helper function to check if a bool function needs to be evaluated
-    // returns true if the expression value is constant false, otherwise true
+    // returns true if the expression value is constant false, otherwise false
     auto is_constant_false = [&compiled_material](const char* expression_path)
     {
         // fetch the constant expression
@@ -405,8 +405,8 @@ bool Mdl_material_target::add_material_to_link_unit(
     }
 
     // add surface emission if available
-    if (exists("surface.emission.emission") && 
-        exists("surface.emission.intensity") && 
+    if (exists("surface.emission.emission") &&
+        exists("surface.emission.intensity") &&
         !is_invalid_df("surface.emission.emission") &&
         !is_constant_black_color("surface.emission.intensity"))
     {
@@ -418,7 +418,7 @@ bool Mdl_material_target::add_material_to_link_unit(
     }
 
     // add absorption
-    if (exists("volume.absorption_coefficient") && 
+    if (exists("volume.absorption_coefficient") &&
         !is_constant_black_color("volume.absorption_coefficient"))
     {
         selected_functions.push_back(mi::neuraylib::Target_function_description(
@@ -468,7 +468,7 @@ bool Mdl_material_target::add_material_to_link_unit(
                 compiled_material->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_SCATTERING);
             bool need_backface_edf =
                 compiled_material->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_EDF_EMISSION) !=
-                compiled_material->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_EDF_EMISSION) || 
+                compiled_material->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_EDF_EMISSION) ||
                 compiled_material->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_INTENSITY) !=
                 compiled_material->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_INTENSITY) ||
                 compiled_material->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_MODE) !=
@@ -1102,7 +1102,7 @@ bool Mdl_material_target::generate()
     if (optimize_renderer_for_available_material_code_path)
     {
         // depending on the functions selected for code generation
-        // 
+        //
         m_hlsl_source_code +=
             interface_data.has_code_feature(Material_code_feature::HAS_INIT)
             ? "#define MDL_HAS_INIT 1\n"
@@ -1273,7 +1273,7 @@ bool Mdl_material_target::generate()
 
                 // handle the type conversion to output a visible color (just for illustration)
                 const std::string& type = interface_data.aovs[i].mdl_type_name == "color"
-                    ? "float3" 
+                    ? "float3"
                     : interface_data.aovs[i].mdl_type_name;
 
                 // select components to create a color
@@ -1347,7 +1347,7 @@ bool Mdl_material_target::compile()
             {
                 if (!it.second)
                     continue;
-                std::string mat_name = it.second->get_material_desciption().get_scene_name();
+                std::string mat_name = it.second->get_material_desciption().get_scene_material().name;
                 std::replace(mat_name.begin(), mat_name.end(), ' ', '_');
                 mat_name.erase(std::remove_if(mat_name.begin(), mat_name.end(),
                     [](auto const& c) { return !std::isalnum(c) && c != '_'; }), mat_name.end());

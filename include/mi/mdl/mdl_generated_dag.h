@@ -1515,6 +1515,7 @@ public:
         NO_TRANSPARENT_LAYERS     = 1 <<  9,
         IGNORE_NOINLINE           = 1 << 10, ///< Ignore anno::noinline() annotations.
         TARGET_MATERIAL_MODEL     = 1 << 11, ///< Target material model mode.
+        RERUN_INLINING            = 1 << 12, ///< Rerun function inlining pass (expensive).
 
         DEFAULT_CLASS_COMPILATION =  ///< Do class compilation with default flags.
             CLASS_COMPILATION |

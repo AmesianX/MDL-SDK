@@ -132,17 +132,11 @@ public:
     explicit My_job( bool shared, DB::Tag tag)
       : m_shared( shared), m_tag( tag) { }
 
-    /// Execution returns a default-constructed My_element. Identifies as parent job, but does not
-    /// store any DB elements upon execution.
-    explicit My_job( bool shared)
-      : m_shared( shared), m_parent( true) { }
-
     // interface implementation
 
     const SERIAL::Serializable* serialize( SERIAL::Serializer* serializer) const final
     {
         serializer->write( m_shared);
-        serializer->write( m_parent);
         serializer->write( m_value);
         serializer->write( m_tag);
         return this + 1;
@@ -150,7 +144,6 @@ public:
     SERIAL::Serializable* deserialize( SERIAL::Deserializer* deserializer) final
     {
         deserializer->read( &m_shared);
-        deserializer->read( &m_parent);
         deserializer->read( &m_value);
         deserializer->read( &m_tag);
         return this + 1;
@@ -167,17 +160,72 @@ public:
         }
     }
     bool get_is_shared() const final { return m_shared; }
-    bool get_is_parent() const final { return m_parent; }
+    bool get_is_parent() const final { return false; }
 
 private:
     bool m_shared = false;
-    bool m_parent = false;
     int m_value   = 0;
     DB::Tag m_tag;
 };
 
+/// A DB job that creates and executes an instance of My_job as child job.
+class My_parent_job : public SCHED::Job<My_parent_job, 0x4d79706a> // Mypj
+{
+public:
+    /// Execution returns an instance of My_element with value 0.
+    ///
+    /// Required for deserialization purposes and failed executions.
+    My_parent_job() { }
+
+    /// Execution returns an instance of My_element with
+    /// - \p value if \p create_child is \c true, and
+    /// - \p value plus one if \p create_child is \c false.
+    explicit My_parent_job( bool identify_as_parent, bool create_child, int value)
+      : m_identify_as_parent( identify_as_parent),
+        m_create_child( create_child),
+        m_value( value) { }
+
+    // interface implementation
+
+    const SERIAL::Serializable* serialize( SERIAL::Serializer* serializer) const final
+    {
+        serializer->write( m_identify_as_parent);
+        serializer->write( m_create_child);
+        serializer->write( m_value);
+        return this + 1;
+    }
+    SERIAL::Serializable* deserialize( SERIAL::Deserializer* deserializer) final
+    {
+        deserializer->read( &m_identify_as_parent);
+        deserializer->read( &m_create_child);
+        deserializer->read( &m_value);
+        return this + 1;
+    }
+    std::string get_class_name() const final { return "My_parent_job"; }
+    mi::Uint32 pre_exec( DB::Tag* tag_array, mi::Uint32 count) final { return 0; }
+    DB::Element_base* execute( DB::Transaction* transaction) const final
+    {
+        if( !m_create_child)
+            return new My_element( m_value + 1);
+
+        // Create child job and return its result.
+        SCHED::Job_base* job = new My_job( /*shared*/ false, m_value);
+        DB::Tag tag = transaction->store( job);
+        DB::Access<My_element> access( tag, transaction);
+        const My_element* element = access.get_ptr();
+        return element->copy();
+    }
+    bool get_is_shared() const final { return true; }
+    bool get_is_parent() const final { return m_identify_as_parent; }
+
+private:
+    bool m_identify_as_parent = false;
+    bool m_create_child       = false;
+    int m_value               = 0;
+};
+
 /// A DB job that fails to return a DB element upon execution.
-class My_failing_job : public SCHED::Job<My_job, 0x4d79666a> // Myfj
+class My_failing_job : public SCHED::Job<My_failing_job, 0x4d79666a> // Myfj
 {
 public:
     // interface implementation
@@ -194,7 +242,7 @@ public:
 };
 
 /// A DB job that increments a counter and blocks on a condition.
-class My_blocking_job : public SCHED::Job<My_job, 0x4d79626a> // Mybj
+class My_blocking_job : public SCHED::Job<My_blocking_job, 0x4d79626a> // Mybj
 {
 public:
     static THREAD::Condition s_execution;
@@ -335,18 +383,18 @@ public:
     { m_state << "aborted " << transaction->get_id()() << "\n"; }
     void check_empty()
     { MI_CHECK( m_state.str().empty()); }
-    void check_and_clear( const char* event, mi::Uint32 id)
+    void check_and_clear( const char* event, DB::Transaction_id id)
     {
         std::ostringstream expected;
-        expected << event << " " << id << "\n";
+        expected << event << " " << id.get_uint() << "\n";
         MI_CHECK_EQUAL( expected.str(), m_state.str());
         m_state.str("");
     }
-    void check_and_clear2( const char* event1, const char* event2, mi::Uint32 id)
+    void check_and_clear2( const char* event1, const char* event2, DB::Transaction_id id)
     {
         std::ostringstream expected;
-        expected << event1 << " " << id << "\n";
-        expected << event2 << " " << id << "\n";
+        expected << event1 << " " << id.get_uint() << "\n";
+        expected << event2 << " " << id.get_uint() << "\n";
         MI_CHECK_EQUAL( expected.str(), m_state.str());
         m_state.str("");
     }
@@ -383,6 +431,16 @@ private:
 class Test_db
 {
 public:
+    /// The default value from DBLIGHT::factory().
+    const int default_initial_tag = 1;
+    /// The default value from DBLIGHT::factory().
+    const int default_initial_transaction_id = 0;
+
+    /// The first tag to allocate.
+    const int initial_tag = default_initial_tag;
+    /// The first transaction ID to allocate.
+    const int initial_transaction_id = default_initial_transaction_id;
+
     /// Constructor.
     ///
     /// \param test_name        Used for progress messages and dump file names.
@@ -425,13 +483,18 @@ Test_db::Test_db( const char* test_name, bool compare, bool enable_journal)
     std::cerr << std::endl;
 
     m_db = DBLIGHT::factory(
-        /*thread_pool*/ nullptr, /*deserialization_manager*/ nullptr, enable_journal);
+        /*thread_pool*/ nullptr,
+        /*deserialization_manager*/ nullptr,
+        enable_journal,
+        initial_tag,
+        initial_transaction_id);
     m_db_impl = static_cast<DBLIGHT::Database_impl*>( m_db);
     m_global_scope = m_db->get_global_scope();
 
     SERIAL::Deserialization_manager* manager = m_db_impl->get_deserialization_manager();
     manager->register_class<My_element>();
     manager->register_class<My_job>();
+    manager->register_class<My_parent_job>();
     manager->register_class<My_failing_job>();
     manager->register_class<My_blocking_job>();
 }
@@ -466,6 +529,18 @@ void Test_db::export_dumps_and_compare()
 
     if( !m_compare)
         return;
+
+    // Dumps are hardcoded to the default values.
+    if( initial_tag != default_initial_tag) {
+        LOG::mod_log->warning( M_DB, LOG::Mod_log::C_DATABASE,
+            "Comparison of dumps disabled due to non-default initial tag.");
+        return;
+    }
+    if( initial_transaction_id != default_initial_transaction_id) {
+        LOG::mod_log->warning( M_DB, LOG::Mod_log::C_DATABASE,
+            "Comparison of dumps disabled due to non-default initial transaction ID.");
+        return;
+    }
 
     fs::path fs_input_dir( MI::TEST::mi_src_path( "base/data/dblight/data"));
     fs::path fs_input_file = fs_input_dir / m_test_name;
@@ -2524,12 +2599,10 @@ void test_scope_delayed_gc()
     }
     transaction1b->commit();
     transaction1b.reset();
-    // The transaction is scope2 prevents the GC from collecting the old version of the element in
-    // scope1.
+    // The open transaction in scope2 does not prevent the GC from collecting the old version of
+    // the element in scope1 (as it would without scopes).
     db.dump();
 
-    // Committing the transaction in scope2 finally allows the GC to collect the old version of the
-    // element in scope1.
     transaction2->commit();
     transaction2.reset();
     db.dump();
@@ -2921,16 +2994,16 @@ void test_transaction_listeners()
     listener->check_empty();
 
     DB::Transaction_ptr transaction = db.m_global_scope->start_transaction();
-    listener->check_and_clear( "created", 0);
+    listener->check_and_clear( "created", transaction->get_id());
 
     transaction->commit();
-    listener->check_and_clear2( "pre_commit", "committed", 0);
+    listener->check_and_clear2( "pre_commit", "committed", transaction->get_id());
 
     transaction = db.m_global_scope->start_transaction();
-    listener->check_and_clear( "created", 1);
+    listener->check_and_clear( "created", transaction->get_id());
 
     transaction->abort();
-    listener->check_and_clear2( "pre_abort", "aborted", 1);
+    listener->check_and_clear2( "pre_abort", "aborted", transaction->get_id());
 
     // test operation/destruction with the client giving up its reference of the listener
     listener.reset();
@@ -3302,6 +3375,7 @@ void test_journal_query()
         MI_CHECK_EQUAL( result->size(), 2);
         std::sort( result->begin(), result->end(), Journal_query_result_cmp);
         DB::Journal_query_result expected { { tag5, journal_a }, { tag7, journal_a } };
+        std::sort( expected.begin(), expected.end(), Journal_query_result_cmp);
         MI_CHECK( *result.get() == expected);
     }
     {
@@ -3375,6 +3449,7 @@ void test_journal_query()
         MI_CHECK_EQUAL( result->size(), 2);
         std::sort( result->begin(), result->end(), Journal_query_result_cmp);
         DB::Journal_query_result expected { { tag5, journal_a }, { tag7, journal_a } };
+        std::sort( expected.begin(), expected.end(), Journal_query_result_cmp);
         MI_CHECK( *result.get() == expected);
     }
     {
@@ -3402,6 +3477,7 @@ void test_journal_query()
         MI_CHECK_EQUAL( result->size(), 2);
         std::sort( result->begin(), result->end(), Journal_query_result_cmp);
         DB::Journal_query_result expected { { tag5, journal_a }, { tag7, journal_a } };
+        std::sort( expected.begin(), expected.end(), Journal_query_result_cmp);
         MI_CHECK( *result.get() == expected);
     }
     {
@@ -3485,6 +3561,7 @@ void test_journal_query_parallel()
         std::sort( result->begin(), result->end(), Journal_query_result_cmp);
         DB::Journal_query_result expected {
             { tag1, journal_a }, { tag3, journal_a }, { tag4, journal_a } };
+        std::sort( expected.begin(), expected.end(), Journal_query_result_cmp);
         MI_CHECK( *result.get() == expected);
     }
 
@@ -3775,20 +3852,43 @@ void test_db_jobs_transaction_store_multiple_tags_per_name()
     db.dump();
 }
 
-void test_db_jobs_transaction_store_parent()
+void test_db_jobs_transaction_access_parent()
 {
-    Test_db db( __func__, /*compare*/ false); // Empty dump
+    Test_db db( __func__);
     DB::Transaction_ptr transaction = db.m_global_scope->start_transaction();
 
-    // Triggers a warning message.
-    auto* job1 = new My_job( /*shared*/ true);
-    transaction->store( job1, "foo");
+    // Parent job creating children (regular case).
+    auto* job1 = new My_parent_job( /*identify_as_parent*/ true, /*create_child*/ true, 42);
+    DB::Tag tag1 = transaction->store( job1);
 
-    // Triggers a warning message.
-    auto* job2 = new My_job( /*shared*/ false);
-    transaction->store( job2);
+    // Parent job without creating children is fine.
+    auto* job2 = new My_parent_job( /*identify_as_parent*/ true, /*create_child*/ false, 44);
+    DB::Tag tag2 = transaction->store( job2);
+
+    // Non-parent job attempting to create children (error).
+    auto* job3 = new My_parent_job( /*identify_as_parent*/ false, /*create_child*/ true, 46);
+    DB::Tag tag3 = transaction->store( job3);
+    db.dump();
+
+    {
+        DB::Access<My_element> access1( tag1, transaction.get());
+        MI_CHECK_EQUAL( access1->get_value(), 42);
+        db.dump();
+    }
+    {
+        DB::Access<My_element> access2( tag2, transaction.get());
+        MI_CHECK_EQUAL( access2->get_value(), 45);
+        db.dump();
+    }
+    {
+        // The job is executed, but a dummy result is returned.
+        DB::Access<My_element> access3( tag3, transaction.get());
+        MI_CHECK_EQUAL( access3->get_value(), 0);
+        db.dump();
+    }
 
     transaction->commit();
+    db.dump();
 }
 
 void test_db_jobs_transaction_access_shared()
@@ -3951,6 +4051,37 @@ void test_db_jobs_execution_without_db_lock()
         // the main DB lock, which would result in a deadlock here.
         DB::Access<My_element> access( tag_job, transaction.get());
         MI_CHECK_EQUAL( access->get_value(), 42);
+    }
+
+    transaction->commit();
+}
+
+void test_db_jobs_result_with_references()
+{
+    Test_db db( __func__);
+    DB::Transaction_ptr transaction = db.m_global_scope->start_transaction();
+
+    auto* element1 = new My_element( 42);
+    DB::Tag tag_element1 = transaction->reserve_tag();
+    transaction->store( tag_element1, element1, "foo1");
+
+    auto* element2 = new My_element( 43, {tag_element1});
+    DB::Tag tag_element2 = transaction->reserve_tag();
+    transaction->store( tag_element2, element2, "foo2");
+
+    auto* job = new My_job( /*shared*/ true, tag_element2);
+    DB::Tag tag_job = transaction->reserve_tag();
+    transaction->store( tag_job, job, "bar");
+    db.dump();
+
+    {
+        DB::Access<My_element> access( tag_job, transaction.get());
+        MI_CHECK_EQUAL( access->get_value(), 43);
+
+        const DB::Tag_set& tag_set = access->get_tag_set();
+        MI_CHECK_EQUAL( tag_set.size(), 1);
+        MI_CHECK_EQUAL( *tag_set.begin(), tag_element1);
+        db.dump();
     }
 
     transaction->commit();
@@ -4449,12 +4580,13 @@ void test( const char* explicit_gc_method)
     test_db_jobs_transaction_store_multiple_versions_without_name();
     test_db_jobs_transaction_store_multiple_names_per_tag();
     test_db_jobs_transaction_store_multiple_tags_per_name();
-    test_db_jobs_transaction_store_parent();
+    test_db_jobs_transaction_access_parent();
     test_db_jobs_transaction_access_shared();
     test_db_jobs_transaction_access_non_shared();
     test_db_jobs_transaction_edit();
     test_db_jobs_transaction_get_class_id();
     test_db_jobs_execution_without_db_lock();
+    test_db_jobs_result_with_references();
     test_db_jobs_parallel_execution();
     test_db_jobs_failing();
     test_transaction_get_tag_is_job();

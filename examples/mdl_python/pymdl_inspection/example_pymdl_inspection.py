@@ -51,7 +51,7 @@ def get_examples_search_path():
     """Try to get the example search path or returns 'mdl' sub folder of the current directory if it failed."""
 
     # get the environment variable that is used in all MDL SDK examples
-    example_sp = os.getenv('MDL_SAMPLES_ROOT')
+    example_sp = os.getenv('MDL_EXAMPLES_ROOT')
 
     # fall back to a path relative to this script file
     if example_sp == None or not os.path.exists(example_sp):
@@ -138,7 +138,7 @@ def run_example(neuray):
             print("\nMDL Module name: %s" % module_mdl_name)
             print("MDL Module DB name: %s" % module_db_name)
 
-            # when the module is loaded we can use the high-level python binding to inspect the module 
+            # when the module is loaded we can use the high-level python binding to inspect the module
             module: pymdl.Module = pymdl.Module._fetchFromDb(transaction, module_db_name)
 
             # inspect the module
@@ -159,7 +159,7 @@ def run_example(neuray):
                 for funcName in module.functions:
                     print(f" * simple name: {funcName}")
                     overloads = module.functions[funcName]
-                    for func in overloads: 
+                    for func in overloads:
                         print(f" - name with signature (overload): {funcName}{func.parameterTypeNames}")
                         matOrFunc = "Material" if func.isMaterial else "Function"
                         print(f"   material or function: {matOrFunc}")
@@ -179,7 +179,7 @@ def run_example(neuray):
                             print(f"       uniform: {argument.type.uniform}")
                             print(f"       varying: {argument.type.varying}")
 
-                        continue ### ONLY TO REDUCE THE AMOUNT OF OUTPUT, feel free to remove the 'continue' 
+                        continue ### ONLY TO REDUCE THE AMOUNT OF OUTPUT, feel free to remove the 'continue'
 
                         # Annotations
                         if func.annotations:
@@ -212,7 +212,7 @@ def main():
             # add default search paths
             cfg.add_mdl_system_paths()
             cfg.add_mdl_user_paths()
-            
+
             # get the example search path that is used for all MDL SDK examples
             # falls back to `mdl` in the current working directory
             example_sp = get_examples_search_path()

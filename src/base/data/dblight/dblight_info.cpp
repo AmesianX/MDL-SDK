@@ -202,12 +202,13 @@ void Info_impl::set_element_from_serialization_check( DB::Element_base* element)
     m_element = element;
 }
 
-void Info_impl::set_element_from_job_execution( DB::Element_base* element)
+void Info_impl::set_element_from_job_execution( DB::Element_base* element, DB::Tag_set& references)
 {
     MI_ASSERT( !m_element);
     MI_ASSERT( element);
 
     m_element = element;
+    m_references = std::move( references);
 }
 
 namespace {
@@ -234,12 +235,26 @@ bool is_aborted( const Transaction_impl_ptr& transaction)
 /// cannot be determined due to the approximation scheme.
 bool same_visibility( const Transaction_impl_ptr& lhs, const Transaction_impl_ptr& rhs)
 {
-    // Indistinguishable transactions (either identical IDs, or both globally visible).
+    // Indistinguishable transactions have same visibility (either identical IDs, or both globally
+    // visible).
     if( lhs == rhs)
         return true;
-    // Exactly one transaction globally visible.
+
+    // The visibility is different if exactly one transaction is globally visible.
     if( !!lhs ^ !!rhs)
         return false;
+
+    // If one of them is still open (or both, but not identical), then the visibility is different.
+    MI_ASSERT( !!lhs && !!rhs);
+    Transaction_impl::State lhs_state = lhs->get_state();
+    Transaction_impl::State rhs_state = rhs->get_state();
+    if( lhs_state == Transaction_impl::OPEN || rhs_state == Transaction_impl::OPEN)
+        return false;
+
+    // Both transaction have been committed, i.e., the visibility ID has been set correctly.
+    MI_ASSERT( lhs_state == Transaction_impl::COMMITTED);
+    MI_ASSERT( rhs_state == Transaction_impl::COMMITTED);
+
     // Compare visibility IDs (Could be improved by replacing each visibility ID by the lowest open
     // transaction larger than or equal to that visibility ID.)
     return lhs->get_visibility_id() == rhs->get_visibility_id();
@@ -740,6 +755,17 @@ void Info_manager::store(
     info->unpin();
 }
 
+void Info_manager::store(
+    DB::Element_base* element,
+    Info_impl* info,
+    DB::Tag_set& references)
+{
+    // Record DB element references of this info.
+    increment_pin_counts( references);
+
+    info->set_element_from_job_execution( element, references);
+}
+
 Info_impl* Info_manager::lookup_info(
     DB::Tag tag,
     DB::Scope* scope,
@@ -919,11 +945,14 @@ void Info_manager::consider_tag_for_gc( DB::Tag tag)
         m_gc_candidates_general.insert( tag);
 }
 
-void Info_manager::garbage_collection( DB::Transaction_id lowest_open)
+void Info_manager::garbage_collection( bool update_lowest_open_transaction_ids)
 {
     Statistics_helper helper( g_garbage_collection);
 
     m_database->get_lock().check_is_owned();
+
+    if( update_lowest_open_transaction_ids)
+        m_database->get_scope_manager()->update_lowest_open_transaction_ids();
 
     if( m_gc_method == GC_FULL_SWEEPS_ONLY) {
 
@@ -936,7 +965,7 @@ void Info_manager::garbage_collection( DB::Transaction_id lowest_open)
             bool progress = false;
             for( const auto& tag: tags) {
                 bool progress_tag = false;
-                cleanup_tag_general( tag, lowest_open, progress_tag);
+                cleanup_tag_general( tag, progress_tag);
                 progress |= progress_tag;
             }
 
@@ -952,7 +981,7 @@ void Info_manager::garbage_collection( DB::Transaction_id lowest_open)
 
         for( const auto& tag: tags1) {
             bool progress_tag = false;
-            cleanup_tag_general( tag, lowest_open, progress_tag);
+            cleanup_tag_general( tag, progress_tag);
         }
 
         bool progress = true;
@@ -988,7 +1017,7 @@ void Info_manager::garbage_collection( DB::Transaction_id lowest_open)
 
         for( const auto& tag: tags1) {
             bool progress_tag = false;
-            cleanup_tag_general( tag, lowest_open, progress_tag);
+            cleanup_tag_general( tag, progress_tag);
         }
 
         bool progress = true;
@@ -1256,9 +1285,15 @@ void Info_manager::dump( std::ostream& s, bool verbose, bool mask_pointer_values
     {
         for( const Info_impl& info: ipt->get_infos()) {
             DB::Element_base* element = info.get_element();
-            SERIAL::Class_id class_id
-                = element ? element->get_class_id() : SERIAL::class_id_unknown;
-            ++counts[class_id];
+            if( element) {
+                SERIAL::Class_id class_id = element->get_class_id();
+                ++counts[class_id];
+            }
+            SCHED::Job_base* job = info.get_job();
+            if( job) {
+                SERIAL::Class_id class_id = job->get_class_id();
+                ++counts[class_id];
+            }
         }
     };
     m_infos_by_tag.apply( count_as_lambda);
@@ -1285,7 +1320,7 @@ void Info_manager::dump( std::ostream& s, bool verbose, bool mask_pointer_values
     s << std::endl;
 }
 
-void Info_manager::cleanup_tag_general( DB::Tag tag, DB::Transaction_id lowest_open, bool& progress)
+void Info_manager::cleanup_tag_general( DB::Tag tag, bool& progress)
 {
     // Note that while we are holding the lock the pin counts of Info_impl's can decrease, but not
     // increase (at least not from zero to non-zero in a legal way).
@@ -1325,20 +1360,20 @@ void Info_manager::cleanup_tag_general( DB::Tag tag, DB::Transaction_id lowest_o
             continue;
         }
 
-        // Clear creator transaction for infos that are globally visible. This is required to
-        // eventually release the transaction, but does not count as GC progress w.r.t. the infos.
+        // Figure out whether the info is globally visible, i.e., for all currently open or future
+        // transactions in the subtree of scopes rooted at the scope of this info.
         //
         // Note that the check for the committed state implies that it is not the lowest open
         // transaction and is required to rule out the ID equality check in is_visible_for().
-        //
-        // This can be improved as follows to clear transactions faster in case of unrelated scopes:
-        // We do not really need to know whether that info is globally visible, just whether it is
-        // visible in all open transactions in the entire subtree of scopes rooted at the scope of
-        // this info. This could be checked by tracking the lowest open transaction ID per scope
-        // and computing the lowest open transaction ID for the scope subtree rooted at the scope
-        // of this info.
-        bool globally_visible = !transaction
-            || (is_committed( transaction) && transaction->is_visible_for( lowest_open));
+        Scope_impl* scope = current->get_scope();
+        DB::Transaction_id lowest_open_id;
+        if( scope)
+            lowest_open_id = scope->get_lowest_open_transaction_id();
+        bool globally_visible = !transaction || !scope
+            || (is_committed( transaction) && transaction->is_visible_for( lowest_open_id));
+
+        // Clear creator transaction for infos that are globally visible. This is required to
+        // eventually release the transaction, but does not count as GC progress w.r.t. the infos.
         if( transaction) {
             if( globally_visible) {
                 current->clear_transaction();

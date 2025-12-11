@@ -33,17 +33,16 @@
 #ifndef EXAMPLE_SHARED_H
 #define EXAMPLE_SHARED_H
 
-#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <tuple>
-#include <vector>
 
 #include "utils/io.h"
+#include "utils/loading.h"
+#include "utils/main_utf8.h"
 #include "utils/mdl.h"
 #include "utils/os.h"
-#include "utils/strings.h"
+#include "utils/sdk_strings.h"
 
 
 /// called to abort the execution of an example in case of failure.
@@ -58,7 +57,7 @@ inline void exit_failure_(
     if (message.empty())
         fprintf(stderr, "Fatal error in file: %s line: %d\n\nClosing the example.\n", file, line);
     else
-        fprintf(stderr, "Fatal error in file: %s line: %d\n  %s\n\nClosing the example.\n", 
+        fprintf(stderr, "Fatal error in file: %s line: %d\n  %s\n\nClosing the example.\n",
             file, line, message.c_str());
 
     // keep console open
@@ -110,21 +109,39 @@ inline void exit_success_()
             exit_failure( "%s", #expr); \
     } while( false)
 
-/// Prints a message.
+/// Prints a message (std::string).
 inline void print_message(
     mi::base::details::Message_severity severity,
     mi::neuraylib::IMessage::Kind kind,
-    const char* msg)
+    std::string msg,
+    const std::string& file = {},
+    int line = 0)
 {
-    std::string s_kind = mi::examples::strings::to_string(kind);
+    std::string kind_str = mi::examples::strings::to_string(kind);
+
+    if (!file.empty()) {
+        msg.append("\n                file: ");
+        msg.append(file);
+        msg.append(", line: ");
+        msg.append(std::to_string(line));
+    }
 
     if (mi::examples::mdl::g_logger) {
-        mi::examples::mdl::g_logger->message(severity, s_kind.c_str(), msg);
+        mi::examples::mdl::g_logger->message(severity, kind_str.c_str(), msg.c_str());
     } else {
-        std::string s_severity = mi::examples::strings::to_string(severity);
-
-        fprintf(stderr, "%s: %s %s\n", s_severity.c_str(), s_kind.c_str(), msg);
+        std::string severity_str = mi::examples::strings::to_string(severity);
+        fprintf(stderr, "%s: %s %s\n", severity_str.c_str(), kind_str.c_str(), msg.c_str());
     }
+}
+
+/// Prints a message (std::string, without explicit kind parameter).
+inline void print_message(
+    mi::base::details::Message_severity severity,
+    const std::string& msg,
+    const std::string& file = {},
+    int line = 0)
+{
+    print_message(severity, mi::neuraylib::IMessage::MSG_INTEGRATION, msg, file, line);
 }
 
 /// Prints the messages of the given context.
@@ -137,35 +154,5 @@ inline bool print_messages(mi::neuraylib::IMdl_execution_context* context)
     }
     return context->get_error_messages_count() == 0;
 }
-
-// ------------------------------------------------------------------------------------------------
-
-// wrap the example entry point in order to support UTF8 arguments
-#ifdef MI_PLATFORM_WINDOWS
-
-    #define MAIN_UTF8 main_utf8
-    #define COMMANDLINE_TO_UTF8 \
-        int wmain(int argc, wchar_t* argv[]) { \
-            char** argv_utf8 = new char*[argc]; \
-            for (int i = 0; i < argc; i++) { \
-                LPWSTR warg = argv[i]; \
-                DWORD size = WideCharToMultiByte(CP_UTF8, 0, warg, -1, NULL, 0, NULL, NULL); \
-                check_success(size > 0); \
-                argv_utf8[i] = new char[size]; \
-                DWORD result = WideCharToMultiByte(CP_UTF8, 0, warg, -1, argv_utf8[i], size, NULL, NULL); \
-                check_success(result > 0); \
-            } \
-            SetConsoleOutputCP(CP_UTF8); \
-            int result = main_utf8(argc, argv_utf8); \
-            delete[] argv_utf8; \
-            return result; \
-        }
-
-#else // MI_PLATFORM_WINDOWS
-
-    #define MAIN_UTF8 main
-    #define COMMANDLINE_TO_UTF8
-
-#endif // MI_PLATFORM_WINDOWS
 
 #endif // MI_EXAMPLE_SHARED_H

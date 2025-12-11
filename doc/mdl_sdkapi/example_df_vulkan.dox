@@ -201,10 +201,10 @@ For detailed instructions, please refer to the \link mi_neuray_getting_started G
 <b>Source Code Location:</b>
   <tt>examples/mdl_sdk/df_vulkan/display.vert</tt>
 
-\include df_vulkan/display.frag
+\include df_vulkan/display.vert
 
 <b>Source Code Location:</b>
-  <tt>examples/mdl_sdk/df_vulkan/display.vert</tt>
+  <tt>examples/mdl_sdk/df_vulkan/display.frag</tt>
 
 \include df_vulkan/display.frag
 

@@ -72,7 +72,7 @@ Transaction_impl::~Transaction_impl()
     m_scope->unpin();
 }
 
-DB::Scope* Transaction_impl::get_scope()
+DB::Scope* Transaction_impl::get_scope() const
 {
     return m_scope;
 }
@@ -264,30 +264,63 @@ std::pair<DB::Info*,bool> Transaction_impl::access_element_shared(
     (void) count;
 
     // Execute the job.
-    DB::Element_base* element = job->execute( this);
+    Job_transaction job_transaction( this);
+    DB::Element_base* element = job->execute( &job_transaction);
 
     // Re-acquire exclusive database lock and unlock transaction commit/abort again.
     m_database->get_lock().lock();
     unblock_commit_or_abort_locked();
 
+    // Check parent flag.
+    if( job_transaction.get_stores_observed() && !job->get_is_parent()) {
+        LOG::mod_log->error(
+            M_DB, LOG::Mod_log::C_DATABASE,
+            "Execution of non-parent job with tag " FMT_TAG " invoked store().",
+            info->get_tag().get_uint());
+        delete element;
+        info->unpin();
+        return {nullptr, false};
+    }
+
     // Check job execution.
     if( !element) {
-        info->unpin();
         LOG::mod_log->error(
             M_DB, LOG::Mod_log::C_DATABASE,
             "Execution of job with tag " FMT_TAG " returned invalid result.",
             info->get_tag().get_uint());
+        delete element;
+        info->unpin();
         return {nullptr, false};
     }
 
     // Check whether some other thread executed the job already by now.
     if( info->get_element()) {
+        LOG::mod_log->warning(
+            M_DB, LOG::Mod_log::C_DATABASE,
+            "Redundant parallel execution of job with tag " FMT_TAG " (performance warning).",
+            info->get_tag().get_uint());
         delete element;
         return {info, false};
     }
 
     // Store job result.
-    info->set_element_from_job_execution( element);
+    DB::Tag_set references;
+    element->get_references( &references);
+
+    // Check privacy levels.
+    DB::Tag tag = info->get_tag();
+    const char* name = info->get_name();
+    if( m_database->get_check_privacy_levels()) {
+        DB::Privacy_level referencing_level = m_scope->get_level();
+        check_privacy_levels( referencing_level, references, tag, name, /*store*/ true);
+    }
+
+    // Check reference cycles.
+    if( m_database->get_check_reference_cycles_store()) {
+        check_reference_cycles( references, tag, name, /*store*/ true);
+    }
+
+    m_database->get_info_manager()->store( element, info, references);
 
     return {info, false};
 }
@@ -645,16 +678,6 @@ void Transaction_impl::store_job_internal(
         LOG::mod_log->error( M_DB, LOG::Mod_log::C_DATABASE, "Invalid job used with "
             "Transaction::%s().", store_for_rc ? "store_for_reference_counting" : "store");
         return;
-    }
-
-    // Warn about incomplete support for parent jobs.
-    //
-    // For example, DB elements/jobs created during execution are not automatically garbage
-    // collected.
-    if( job->get_is_parent()) {
-        LOG::mod_log->warning(
-            M_DB, LOG::Mod_log::C_DATABASE,
-            "Support for parent jobs is incomplete (tag " FMT_TAG ").", tag.get_uint());
     }
 
     THREAD::Block block( &m_database->get_lock());
@@ -1544,8 +1567,6 @@ std::ostream& operator<<( std::ostream& s, const Transaction_impl::State& state)
 
 Transaction_manager::~Transaction_manager()
 {
-    MI_ASSERT( m_open_transactions.empty());
-
     // Removal of all scopes (and their infos) should not leave any transactions behind.
     MI_ASSERT( m_all_transactions.empty());
 }
@@ -1560,7 +1581,7 @@ Transaction_impl* Transaction_manager::start_transaction( Scope_impl* scope)
         THREAD::Block block( m_all_transactions_lock);
         m_all_transactions.insert( *transaction);
     }
-    m_open_transactions.insert( *transaction);
+    scope->add_open_transaction( transaction);
 
     m_database->notify_transaction_listeners(
         &DB::ITransaction_listener::transaction_created, transaction);
@@ -1593,9 +1614,8 @@ bool Transaction_manager::end_transaction( Transaction_impl* transaction, bool c
     transaction->wait_for_fragmented_jobs_locked( commit);
     m_database->get_lock().check_is_owned();
 
-    auto it = m_open_transactions.find( *transaction);
-    MI_ASSERT( it != m_open_transactions.end());
-    m_open_transactions.erase( it);
+    Scope_impl* scope = static_cast<Scope_impl*>( transaction->get_scope());
+    scope->remove_open_transaction( transaction);
 
     transaction->unpin_pinned_infos();
 
@@ -1638,7 +1658,8 @@ bool Transaction_manager::end_transaction( Transaction_impl* transaction, bool c
 
     transaction->unpin();
 
-    m_database->get_info_manager()->garbage_collection( get_lowest_open_transaction_id());
+    m_database->get_info_manager()->garbage_collection(
+        /*update_lowest_open_transaction_ids*/ true);
 
     return true;
 }
@@ -1652,27 +1673,19 @@ void Transaction_manager::remove_from_all_transactions( Transaction_impl* transa
     m_all_transactions.erase( it);
 }
 
-DB::Transaction_id Transaction_manager::get_lowest_open_transaction_id() const
-{
-    m_database->get_lock().check_is_owned_shared_or_exclusive();
-
-    auto it = m_open_transactions.begin();
-    return it == m_open_transactions.end() ? m_next_transaction_id : it->get_id();
-}
-
 void Transaction_manager::dump( std::ostream& s, bool verbose, bool mask_pointer_values)
 {
     m_database->get_lock().check_is_owned_shared_or_exclusive();
     THREAD::Block block( m_all_transactions_lock);
 
     s << "Count of all transactions: " << m_all_transactions.size() << std::endl;
-    s << "Count of open transactions: " << m_open_transactions.size() << std::endl;
 
     for( const auto& t: m_all_transactions) {
 
         s << "ID " << t.get_id()();
         if( !mask_pointer_values) s << " at " << &t;
-        s << ": pin count = " << t.get_pin_count()
+        s << ": scope ID = " << t.get_scope()->get_id()
+          << ", pin count = " << t.get_pin_count()
           << ", state = " << t.get_state()
           << ", next sequence number = " << t.get_next_sequence_number()
           << ", visibility ID = " << t.get_visibility_id()();
@@ -1701,6 +1714,114 @@ void Transaction_manager::dump( std::ostream& s, bool verbose, bool mask_pointer
 
     if( !m_all_transactions.empty())
         s << std::endl;
+}
+
+DB::Tag Job_transaction::store(
+    DB::Element_base* element,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    return m_transaction->store_for_reference_counting(
+        element, name, privacy_level, store_level);
+}
+
+void Job_transaction::store(
+    DB::Tag tag,
+    DB::Element_base* element,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Journal_type journal_type,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    m_transaction->store_for_reference_counting(
+        tag, element, name, privacy_level, journal_type, store_level);
+}
+
+DB::Tag Job_transaction::store_for_reference_counting(
+    DB::Element_base* element,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    return m_transaction->store_for_reference_counting(
+        element, name, privacy_level, store_level);
+}
+
+void Job_transaction::store_for_reference_counting(
+    DB::Tag tag,
+    DB::Element_base* element,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Journal_type journal_type,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    m_transaction->store_for_reference_counting(
+        tag, element, name, privacy_level, journal_type, store_level);
+}
+
+DB::Tag Job_transaction::store(
+    SCHED::Job_base* job,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    return m_transaction->store_for_reference_counting(
+        job, name, privacy_level, store_level);
+}
+
+void Job_transaction::store(
+    DB::Tag tag,
+    SCHED::Job_base* job,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Journal_type journal_type,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    m_transaction->store_for_reference_counting(
+        tag, job, name, privacy_level, journal_type, store_level);
+}
+
+DB::Tag Job_transaction::store_for_reference_counting(
+    SCHED::Job_base* job,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    return m_transaction->store_for_reference_counting(
+        job, name, privacy_level, store_level);
+}
+
+void Job_transaction::store_for_reference_counting(
+    DB::Tag tag,
+    SCHED::Job_base* job,
+    const char* name,
+    DB::Privacy_level privacy_level,
+    DB::Journal_type journal_type,
+    DB::Privacy_level store_level)
+{
+    m_stores_observed = true;
+    m_transaction->store_for_reference_counting(
+        tag, job, name, privacy_level, journal_type, store_level);
+}
+
+bool Job_transaction::commit()
+{
+    MI_ASSERT( !"Job_transaction::commit() must not be invoked");
+    return m_transaction->commit();
+}
+
+void Job_transaction::abort()
+{
+    MI_ASSERT( !"Job_transaction::abort() must not be invoked");
+    m_transaction->abort();
 }
 
 void Fragmented_job::job_finished()

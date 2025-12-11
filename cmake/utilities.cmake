@@ -82,8 +82,7 @@ function(TARGET_BUILD_SETUP)
 
     # WINDOWS
     #---------------------------------------------------------------------------------------
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID MATCHES "MSVC"))
         target_compile_definitions(${TARGET_BUILD_SETUP_TARGET}
             PRIVATE
                 "MI_PLATFORM_WINDOWS"
@@ -101,7 +100,7 @@ function(TARGET_BUILD_SETUP)
                     "UNICODE"
                 )
             if(MDL_LOG_FILE_DEPENDENCIES)
-                MESSAGE(STATUS "- add defines:    '_UNICODE' and 'UNICODE'")
+                message(STATUS "- add defines:    '_UNICODE' and 'UNICODE'")
             endif()
         endif()
 
@@ -109,9 +108,17 @@ function(TARGET_BUILD_SETUP)
             PRIVATE
                 "/Zc:__cplusplus" # make visual studio report the correct __cplusplus
                 "/MP"
-                "/wd4267"         # suppress Warning C4267 'argument': conversion from 'size_t' to 'int', possible loss of data
+                "/wd4996"         # suppress warning C4267 'write': The POSIX name for this item is
+                                  # deprecated. Instead, use the ISO C and C++ conformant name: _write.
+                "/wd4267"         # suppress warning C4267 'argument': conversion from 'size_t' to
+                                  # 'int', possible loss of data
                 "/permissive-"    # show more errors
             )
+
+        set_target_properties(${TARGET_BUILD_SETUP_TARGET} PROPERTIES
+            LINK_FLAGS
+                "/ignore:4099"    # suppress warning LNK4099: PDB '' was not found with '...' or at '';
+            )                     # linking object as if no debug info
 
         # set static or dynamic runtime
         # cmake 3.15 has an option for that. MSVC_RUNTIME_LIBRARY
@@ -129,12 +136,12 @@ function(TARGET_BUILD_SETUP)
         if(_DYNAMIC)
             target_compile_options(${TARGET_BUILD_SETUP_TARGET} PRIVATE "/MD$<$<CONFIG:Debug>:d>")
             if(MDL_LOG_FILE_DEPENDENCIES)
-                MESSAGE(STATUS "- MSVC runtime:   dynamic (/MD or /MDd)")
+                message(STATUS "- MSVC runtime:   dynamic (/MD or /MDd)")
             endif()
         else()
             target_compile_options(${TARGET_BUILD_SETUP_TARGET} PRIVATE "/MT$<$<CONFIG:Debug>:d>")
             if(MDL_LOG_FILE_DEPENDENCIES)
-                MESSAGE(STATUS "- MSVC runtime:   static (/MT or /MTd)")
+                message(STATUS "- MSVC runtime:   static (/MT or /MTd)")
             endif()
         endif()
 
@@ -150,7 +157,7 @@ function(TARGET_BUILD_SETUP)
                 "$<$<STREQUAL:${MI_PLATFORM_NAME},linux-aarch64>:AARCH64>"
                 "$<$<STREQUAL:${MI_PLATFORM_NAME},linux-x86-64>:HAS_SSE>"
                 "LINUX"
-                "_FORTIFY_SOURCE=3"
+                "$<$<CONFIG:Release>:_FORTIFY_SOURCE=3>"
             )
 
         target_compile_options(${TARGET_BUILD_SETUP_TARGET}
@@ -354,16 +361,16 @@ function(TARGET_PRINT_LOG_HEADER)
         get_target_property(TARGET_PRINT_LOG_HEADER_TYPE ${TARGET_PRINT_LOG_HEADER_TARGET} TYPE)
     endif()
     if(MDL_LOG_DEPENDENCIES)
-        MESSAGE(STATUS "")
-        MESSAGE(STATUS "---------------------------------------------------------------------------------")
+        message(STATUS "")
+        message(STATUS "---------------------------------------------------------------------------------")
     endif()
-    MESSAGE(STATUS "[PROJECT] ${TARGET_PRINT_LOG_HEADER_TARGET}   (${TARGET_PRINT_LOG_HEADER_TYPE})")
+    message(STATUS "[PROJECT] ${TARGET_PRINT_LOG_HEADER_TARGET}   (${TARGET_PRINT_LOG_HEADER_TYPE})")
     if(MDL_LOG_DEPENDENCIES)
         if(TARGET_PRINT_LOG_HEADER_VERSION)
-            MESSAGE(STATUS "VERSION:          ${TARGET_PRINT_LOG_HEADER_VERSION}")
+            message(STATUS "VERSION:          ${TARGET_PRINT_LOG_HEADER_VERSION}")
         endif()
-        MESSAGE(STATUS "SOURCE DIR:       ${CMAKE_CURRENT_SOURCE_DIR}")
-        MESSAGE(STATUS "BINARY DIR:       ${CMAKE_CURRENT_BINARY_DIR}")
+        message(STATUS "SOURCE DIR:       ${CMAKE_CURRENT_SOURCE_DIR}")
+        message(STATUS "BINARY DIR:       ${CMAKE_CURRENT_BINARY_DIR}")
     endif()
 
 endfunction()
@@ -405,7 +412,7 @@ function(TARGET_COPY_TO_OUTPUT_DIR)
         # handle directories and files slightly different
         if(IS_DIRECTORY ${_SOURCE_FILE})
             if(MDL_LOG_FILE_DEPENDENCIES)
-                MESSAGE(STATUS "- folder to copy: ${_SOURCE_FILE}")
+                message(STATUS "- folder to copy: ${_SOURCE_FILE}")
             endif()
             add_custom_command(
                 TARGET ${TARGET_COPY_TO_OUTPUT_DIR_TARGET} POST_BUILD
@@ -414,10 +421,10 @@ function(TARGET_COPY_TO_OUTPUT_DIR)
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${_SOURCE_FILE} $<TARGET_FILE_DIR:${TARGET_COPY_TO_OUTPUT_DIR_TARGET}>${_SUBFOLDER}/${_FOLDER_PATH}
             )
         elseif (TARGET ${_SOURCE_FILE})
-            GET_TARGET_PROPERTY(__libname ${_SOURCE_FILE} LOCATION)
+            get_target_property(__libname ${_SOURCE_FILE} LOCATION)
 
             if(MDL_LOG_FILE_DEPENDENCIES)
-                    MESSAGE(STATUS "- libname to copy: ${__libname} (for target: ${_SOURCE_FILE}) ")
+                    message(STATUS "- libname to copy: ${__libname} (for target: ${_SOURCE_FILE}) ")
             endif()
             add_custom_command(
                 TARGET ${TARGET_COPY_TO_OUTPUT_DIR_TARGET} POST_BUILD
@@ -427,7 +434,7 @@ function(TARGET_COPY_TO_OUTPUT_DIR)
             )
         else()
             if(MDL_LOG_FILE_DEPENDENCIES)
-                MESSAGE(STATUS "- file to copy:   ${_SOURCE_FILE}")
+                message(STATUS "- file to copy:   ${_SOURCE_FILE}")
             endif()
             add_custom_command(
                 TARGET ${TARGET_COPY_TO_OUTPUT_DIR_TARGET} POST_BUILD
@@ -516,7 +523,7 @@ function(__TARGET_ADD_DEPENDENCY)
             find_package(${__TARGET_ADD_DEPENDENCY_DEPENDS})
             # if the target was not found this is a error
             if(NOT ${__TARGET_ADD_DEPENDENCY_DEPENDS}_FOUND)
-                MESSAGE(FATAL_ERROR "The dependency \"${__TARGET_ADD_DEPENDENCY_DEPENDS}\" for target \"${__TARGET_ADD_DEPENDENCY_TARGET}\" could not be resolved.")
+                message(FATAL_ERROR "The dependency \"${__TARGET_ADD_DEPENDENCY_DEPENDS}\" for target \"${__TARGET_ADD_DEPENDENCY_TARGET}\" could not be resolved.")
             endif()
         endif()
 
@@ -667,7 +674,7 @@ function(TARGET_ADD_TOOL_DEPENDENCY)
         # use a default fallback
         find_program(${TARGET_ADD_TOOL_DEPENDENCY_TOOL}_PATH ${TARGET_ADD_TOOL_DEPENDENCY_TOOL})
         if(NOT ${TARGET_ADD_TOOL_DEPENDENCY_TOOL}_PATH)
-            MESSAGE(FATAL_ERROR "The tool dependency \"${TARGET_ADD_TOOL_DEPENDENCY_TOOL}\" for target \"${TARGET_ADD_TOOL_DEPENDENCY_TARGET}\" could not be resolved.")
+            message(FATAL_ERROR "The tool dependency \"${TARGET_ADD_TOOL_DEPENDENCY_TOOL}\" for target \"${TARGET_ADD_TOOL_DEPENDENCY_TARGET}\" could not be resolved.")
         endif()
 
     endif()
@@ -737,11 +744,11 @@ function(CREATE_FROM_BASE_PRESET)
         OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "SHARED"
         OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "MODULE")
         add_library(${CREATE_FROM_BASE_PRESET_TARGET} ${CREATE_FROM_BASE_PRESET_TYPE} ${CREATE_FROM_BASE_PRESET_SOURCES})
-    elseif(CREATE_FROM_BASE_PRESET_TYPE STREQUAL "EXECUTABLE" OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "WIN_EXECUTABLE")
+    elseif(CREATE_FROM_BASE_PRESET_TYPE STREQUAL "EXECUTABLE"
+        OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "WIN_EXECUTABLE")
         add_executable(${CREATE_FROM_BASE_PRESET_TARGET} ${EXEC_TYPE} ${CREATE_FROM_BASE_PRESET_SOURCES})
-        #set_target_properties(${CREATE_FROM_BASE_PRESET_TARGET} PROPERTIES WIN32_EXECUTABLE ON)
         # inject compile constant that contains the binary name
-        target_compile_definitions(${PROJECT_NAME}
+        target_compile_definitions(${CREATE_FROM_BASE_PRESET_TARGET}
             PRIVATE
                 "BINARY_NAME=\"${CREATE_FROM_BASE_PRESET_OUTPUT_NAME}\""
             )
@@ -765,12 +772,29 @@ function(CREATE_FROM_BASE_PRESET)
 
     # adjust output file name if requested
     if(CREATE_FROM_BASE_PRESET_OUTPUT_NAME)
-        set_target_properties(${CREATE_FROM_BASE_PRESET_TARGET} PROPERTIES OUTPUT_NAME ${CREATE_FROM_BASE_PRESET_OUTPUT_NAME})
+        set_target_properties(${CREATE_FROM_BASE_PRESET_TARGET} PROPERTIES
+            OUTPUT_NAME ${CREATE_FROM_BASE_PRESET_OUTPUT_NAME})
     endif()
 
     # adjust export target name if requested
     if(CREATE_FROM_BASE_PRESET_EXPORT_NAME)
-        set_target_properties(${CREATE_FROM_BASE_PRESET_TARGET} PROPERTIES EXPORT_NAME ${CREATE_FROM_BASE_PRESET_EXPORT_NAME})
+        set_target_properties(${CREATE_FROM_BASE_PRESET_TARGET} PROPERTIES
+            EXPORT_NAME ${CREATE_FROM_BASE_PRESET_EXPORT_NAME})
+    endif()
+
+    # for examples define directory relative to examples root
+    if(CREATE_FROM_BASE_PRESET_EXAMPLE)
+        string(REGEX
+            REPLACE "^.*/(examples|mdl_examples)/(.*)$"
+            "\\2"
+            _MDL_EXAMPLE_RELATIVE_DIRECTORY
+            "${CMAKE_CURRENT_BINARY_DIR}")
+        file(TO_NATIVE_PATH "${_MDL_EXAMPLE_RELATIVE_DIRECTORY}" _MDL_EXAMPLE_RELATIVE_DIRECTORY)
+        string(REPLACE "\\" "\\\\" _MDL_EXAMPLE_RELATIVE_DIRECTORY ${_MDL_EXAMPLE_RELATIVE_DIRECTORY})
+        target_compile_definitions(${CREATE_FROM_BASE_PRESET_TARGET}
+            PRIVATE
+                "MDL_EXAMPLE_RELATIVE_DIRECTORY=\"${_MDL_EXAMPLE_RELATIVE_DIRECTORY}\""
+            )
     endif()
 
     # log message
@@ -798,10 +822,12 @@ function(CREATE_FROM_BASE_PRESET)
     endif()
 
     # embed .rc files
-    if(CREATE_FROM_BASE_PRESET_EMBED_RC AND WINDOWS AND (   CREATE_FROM_BASE_PRESET_TYPE STREQUAL "SHARED"
-                                                         OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "MODULE"
-                                                         OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "EXECUTABLE"
-                                                         OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "WIN_EXECUTABLE"))
+    if(CREATE_FROM_BASE_PRESET_EMBED_RC
+        AND WINDOWS
+        AND (   CREATE_FROM_BASE_PRESET_TYPE STREQUAL "SHARED"
+             OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "MODULE"
+             OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "EXECUTABLE"
+             OR CREATE_FROM_BASE_PRESET_TYPE STREQUAL "WIN_EXECUTABLE"))
         if(MDL_LOG_FILE_DEPENDENCIES)
             message(STATUS "- embedding:      ${CREATE_FROM_BASE_PRESET_EMBED_RC}")
         endif()
@@ -942,7 +968,7 @@ function(TARGET_ADD_CUDA_PTX_RULE)
         list(APPEND PTX_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_SRC_NAME}.ptx)
 
         if(MDL_LOG_FILE_DEPENDENCIES)
-            MESSAGE(STATUS "- file to copy:   ${_SRC_NAME}.ptx")
+            message(STATUS "- file to copy:   ${_SRC_NAME}.ptx")
         endif()
 
         if(_GENERATOR_IS_MULTI_CONFIG)
@@ -1003,7 +1029,8 @@ function(TARGET_ADD_CONTENT)
     if(NOT TARGET_ADD_CONTENT_DEP_NAME)
         set(TARGET_ADD_CONTENT_DEP_NAME "content")
     endif()
-    if(WINDOWS)
+    get_property(_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    if(_GENERATOR_IS_MULTI_CONFIG)
         set(_DEP ${CMAKE_CURRENT_BINARY_DIR}/$(Configuration)/${TARGET_ADD_CONTENT_DEP_NAME}.d)
     else()
         set(_DEP ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_ADD_CONTENT_DEP_NAME}.d)
@@ -1040,7 +1067,7 @@ function(TARGET_ADD_CONTENT)
 
         # copy commands
         if(MDL_LOG_FILE_DEPENDENCIES)
-            MESSAGE(STATUS "- content to copy:   ${TARGET_ADD_CONTENT_FILE_BASE}${_FILE}")
+            message(STATUS "- content to copy:   ${TARGET_ADD_CONTENT_FILE_BASE}${_FILE}")
         endif()
         list(APPEND _COMMAND_LIST COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TARGET_ADD_CONTENT_FILE_BASE}${_FILE} $<TARGET_FILE_DIR:${TARGET_ADD_CONTENT_TARGET}>/${TARGET_ADD_CONTENT_TARGET_BASE}${_FILE})
         list(APPEND _COMMAND_LIST COMMAND ${CMAKE_COMMAND} -E echo "update content file: ${TARGET_ADD_CONTENT_TARGET_BASE}${_FILE}")
@@ -1048,7 +1075,7 @@ function(TARGET_ADD_CONTENT)
     endforeach()
 
     # delete dependency files of other configurations to enforce an update after the build type changed
-    if(WINDOWS)
+    if(_GENERATOR_IS_MULTI_CONFIG)
         file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Debug)
         file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Release)
         file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/RelWithDebInfo)
@@ -1439,7 +1466,7 @@ function(CREATE_FROM_PYTHON_PRESET)
     target_add_vs_debugger_env_var(TARGET ${CREATE_FROM_PYTHON_PRESET_TARGET}
         VARS
             "PYTHONPATH=${BINDING_MODULE_PATH}/$(Configuration)%3B%PYTHONPATH%"
-            "MDL_SAMPLES_ROOT=${MDL_EXAMPLES_FOLDER}"
+            "MDL_EXAMPLES_ROOT=${MDL_EXAMPLES_FOLDER}"
         )
 
     target_create_vs_user_settings(TARGET ${CREATE_FROM_PYTHON_PRESET_TARGET})

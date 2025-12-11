@@ -51,7 +51,7 @@ struct Options
     bool no_window = false;
 
     // Output filename in headless mode.
-    std::string outputfile = "output.png"; 
+    std::string outputfile = "output.png";
 
     // The resolution of the display / image.
     uint32_t res_x = 1024;
@@ -166,8 +166,8 @@ VkShaderModule create_fragment_shader_module(
     main_source << "#version 450\n";
     main_source << "#define NUM_TEXTURES "
         << std::to_string(target_code->get_texture_count() - 1) << "\n";
-    main_source << mi::examples::io::read_text_file(
-        mi::examples::io::get_executable_folder() + "/" + g_fragment_shader_filename);
+    main_source << mi::examples::mdl::read_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, g_fragment_shader_filename);
 #ifdef DUMP_GLSL
     std::cout << "Dumping main GLSL code:\n\n" << main_source.str() << std::endl;
 #endif
@@ -175,8 +175,9 @@ VkShaderModule create_fragment_shader_module(
     std::string generated_target_source(target_code->get_code());
     if (remap_noise_functions)
     {
-        generated_target_source.append(mi::examples::io::read_text_file(
-            mi::examples::io::get_executable_folder() + "/" + "noise_no_lut.glsl"));
+        std::string noise_source = mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
+        generated_target_source.append(noise_source);
     }
 #ifdef DUMP_GLSL
     std::cout << "Dumping GLSL target code:\n\n" << generated_target_source << std::endl;
@@ -189,7 +190,8 @@ VkShaderModule create_fragment_shader_module(
         << glsl_switch_func_source << std::endl;
 #endif
 
-    mi::examples::vk::Glsl_compiler glsl_compiler(EShLangFragment, "main");
+    mi::examples::vk::Glsl_compiler glsl_compiler(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, EShLangFragment, "main");
     glsl_compiler.add_shader(main_source.str());
     glsl_compiler.add_shader(generated_target_source);
     glsl_compiler.add_shader(glsl_switch_func_source);
@@ -209,10 +211,11 @@ VkShaderModule create_fragment_shader_module(
 
 VkShaderModule create_vertex_shader_module(VkDevice device)
 {
-    std::string shader_source = mi::examples::io::read_text_file(
-        mi::examples::io::get_executable_folder() + "/" + g_vertex_shader_filename);
+    std::string shader_source = mi::examples::mdl::read_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, g_vertex_shader_filename);
 
-    mi::examples::vk::Glsl_compiler glsl_compiler(EShLangVertex, "main");
+    mi::examples::vk::Glsl_compiler glsl_compiler(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, EShLangVertex, "main");
     glsl_compiler.add_shader(shader_source);
     std::vector<unsigned int> compiled_shader = glsl_compiler.link_program();
 
@@ -483,7 +486,7 @@ Vulkan_texture create_material_texture(
 
     // Create the Vulkan image
     Vulkan_texture material_texture;
-    
+
     VkImageCreateInfo image_create_info = {};
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -582,11 +585,10 @@ class Example_app : public mi::examples::vk::Vulkan_example_app
 public:
     Example_app(
         mi::base::Handle<mi::neuraylib::ITransaction> transaction,
-        mi::base::Handle<mi::neuraylib::IMdl_impexp_api> mdl_impexp_api,
-        mi::base::Handle<mi::neuraylib::IImage_api> image_api,
+        mi::base::Handle<mi::neuraylib::INeuray> neuray,
         mi::base::Handle<const mi::neuraylib::ITarget_code> target_code,
         const Options& options)
-    : Vulkan_example_app(mdl_impexp_api.get(), image_api.get())
+    : Vulkan_example_app(neuray.get())
     , m_transaction(transaction)
     , m_target_code(target_code)
     , m_options(options)
@@ -637,7 +639,7 @@ private:
 private:
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
     mi::base::Handle<const mi::neuraylib::ITarget_code> m_target_code;
-    
+
     // Vulkan resources created for the target code
     Vulkan_buffer m_ro_data_buffer;
     std::vector<Vulkan_texture> m_material_textures;
@@ -776,7 +778,7 @@ void Example_app::render(VkCommandBuffer command_buffer, uint32_t frame_index, u
     vkCmdBindDescriptorSets(
         command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_layout,
         0, 1, &m_descriptor_set, 0, nullptr);
-    
+
     vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_query_pool, frame_index * 2);
 
     vkCmdDraw(command_buffer, 3, 1, 0, 0);
@@ -871,7 +873,8 @@ void Example_app::create_graphics_pipeline_layout()
 void Example_app::create_graphics_pipeline()
 {
     VkShaderModule vertex_shader
-        = mi::examples::vk::create_shader_module_from_file(m_device, g_vertex_shader_filename, EShLangVertex);
+        = mi::examples::vk::create_shader_module_from_file(
+            m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, g_vertex_shader_filename, EShLangVertex);
     VkShaderModule fragment_shader
         = create_fragment_shader_module(m_device, m_target_code.get(), m_options.remap_noise_functions);
 
@@ -1014,14 +1017,15 @@ void usage(char const* prog_name)
     std::cout
         << "Usage: " << prog_name << " [options] [<material_pattern>]\n"
         << "Options:\n"
-        << "  --nowin              don't show interactive display\n"
+        << "  --no_window          don't show interactive display\n"
         << "  --res <x> <y>        resolution (default: 1024x768)\n"
         << "  --numimg <n>         swapchain image count (default: 3)\n"
         << "  --device <id>        run on supported GPU <id>\n"
-        << "  -o <outputfile>      image file to write result in nowin mode (default: output.png)\n"
+        << "  -o <outputfile>      image file to write result when --no_window is used (default:\n"
+        << "                       output.png)\n"
         << "  --vkdebug            enable the Vulkan validation layers\n"
         << "  --no_noise_remap     don't remap MDL ::base noise functions\n"
-        << "  --enable_ro_segment  enable the read-only data segment\n" 
+        << "  --enable_ro_segment  enable the read-only data segment\n"
         << "  <material_pattern>   a number from 1 to 7 choosing which material combination to use"
         << std::endl;
     exit_failure();
@@ -1036,7 +1040,7 @@ Options parse_command_line(int argc, char* argv[])
         std::string arg = argv[i];
         if (arg[0] == '-')
         {
-            if (arg == "--nowin")
+            if (arg == "--no_window")
                 options.no_window = true;
             else if (arg == "-o" && i < argc - 1)
                 options.outputfile = argv[++i];
@@ -1195,8 +1199,7 @@ int MAIN_UTF8(int argc, char* argv[])
             // Start application. The generated target code is used to create
             // the fragment shader module for the graphics pipeline, as well
             // as create the rendering resources (ro-data, textures, etc.)
-            Example_app app(
-                transaction, mdl_impexp_api, image_api, target_code, options);
+            Example_app app(transaction, neuray, target_code, options);
             app.run(app_config);
         }
 

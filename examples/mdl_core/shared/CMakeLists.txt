@@ -64,10 +64,10 @@ create_from_base_preset(
 )
 add_library(mdl_core::shared ALIAS ${PROJECT_NAME})
 
-# inject the MDL_SAMPLES_ROOT path
+# inject the MDL_EXAMPLES_ROOT path
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE
-        "MDL_SAMPLES_ROOT=\"${MDL_EXAMPLES_FOLDER}\""
+        "MDL_EXAMPLES_ROOT=\"${MDL_EXAMPLES_FOLDER}\""
     )
 
 # add dependencies

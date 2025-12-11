@@ -687,7 +687,7 @@ options:
 
   -h|--help                     Print this usage message and exit.
   -p|--mdl_path <path>          Add the given path to the MDL search path.
-  -n|--nostdpath                Prevent adding the MDL system and user search
+  -n|--nostdpath                Prevent adding the MDL system, user, and example search
                                 path(s) to the MDL search path.
   -o|--output <file>            Export the module to this file. Default: stdout
   -b|--backend <backend>        Select the back-end to generate code for. One of

@@ -1560,7 +1560,7 @@ public:
                                 m_name_resolver.get_owner_dag(call->get_name()));
 
                             DAG_node const *res = m_dag_builder.try_inline(
-                                owner_dag.get(), def, args.data(), n_args);
+                                call, owner_dag.get(), def, args.data(), n_args);
                             if (res != NULL) {
                                 // inlining was successful, try to optimize the result further
                                 res = optimize(res);

@@ -160,7 +160,7 @@ private:
 // --------------------------------------------------------------------------
 
 /// Implementation of a resource reader from a file.
-class MDL_zip_resource_reader : public Allocator_interface_implement<IMDL_resource_reader>
+class MDL_zip_resource_reader MDL_FINAL : public Allocator_interface_implement<IMDL_resource_reader>
 {
     typedef Allocator_interface_implement<IMDL_resource_reader> Base;
 public:

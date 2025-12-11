@@ -36,7 +36,7 @@
 #include <thread>
 #include <set>
 #include <atomic>
-#include <utils/strings.h>
+#include <utils/sdk_strings.h>
 #include <chrono>
 #include <TlHelp32.h>
 #include <processthreadsapi.h>

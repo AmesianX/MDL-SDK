@@ -807,7 +807,12 @@ qualified_utf8_name<IQualified_name *&value>
                                             ISimple_name const *simp_name = NULL;
                                         .)
     (
-        "::"                            (. value->set_absolute(); .)
+        "::"                            (.
+                                            Position &pos = value->access_position();
+                                            pos.set_start_line(t->line);
+                                            pos.set_start_column(t->col);
+                                            value->set_absolute();
+                                        .)
         [
             utf8_name<simp_name>        (. value->add_component(to_simple(simp_name)); .)
             {
@@ -891,7 +896,12 @@ qualified_name<IQualified_name *&value>
                                         .)
         [
             "::"
-                                        (. value->set_absolute(); .)
+                                        (.
+                                            Position &pos = value->access_position();
+                                            pos.set_start_line(t->line);
+                                            pos.set_start_column(t->col);
+                                            value->set_absolute();
+                                        .)
         ]
         ( simple_name<simp_name> | simple_unicode_name<simp_name> )
                                         (.
@@ -2538,13 +2548,14 @@ unary_expression<IExpression const *&exp>
     =
                                             (.
                                                 IType_name *name = ERR_TYPE;
-                                                int sl = t->line;
-                                                int sc = t->col;
+                                                int sl = 0, sc = 0;
                                                 exp = ERR_EXPR;
                                             .)
     (
         IF(is_c_style_cast())
-            '(' type<name> ')' unary_expression<exp>
+            '('                             (. sl = t->line; sc = t->col; .)
+               type<name>
+            ')' unary_expression<exp>
                                             (.
                                                 errors->Error(
                                                     sl, sc,
@@ -2575,12 +2586,12 @@ unary_expression<IExpression const *&exp>
                                                     = IExpression_unary::OK_POSITIVE;
                                                 IExpression const *right = ERR_EXPR;
                                             .)
-        ( "~"                               (. op = IExpression_unary::OK_BITWISE_COMPLEMENT; .)
-        | "!"                               (. op = IExpression_unary::OK_LOGICAL_NOT; .)
-        | "+"                               (. op = IExpression_unary::OK_POSITIVE; .)
-        | "-"                               (. op = IExpression_unary::OK_NEGATIVE; .)
-        | "++"                              (. op = IExpression_unary::OK_PRE_INCREMENT; .)
-        | "--"                              (. op = IExpression_unary::OK_PRE_DECREMENT; .)
+        ( "~"                               (. sl = t->line; sc = t->col; op = IExpression_unary::OK_BITWISE_COMPLEMENT; .)
+        | "!"                               (. sl = t->line; sc = t->col; op = IExpression_unary::OK_LOGICAL_NOT; .)
+        | "+"                               (. sl = t->line; sc = t->col; op = IExpression_unary::OK_POSITIVE; .)
+        | "-"                               (. sl = t->line; sc = t->col; op = IExpression_unary::OK_NEGATIVE; .)
+        | "++"                              (. sl = t->line; sc = t->col; op = IExpression_unary::OK_PRE_INCREMENT; .)
+        | "--"                              (. sl = t->line; sc = t->col; op = IExpression_unary::OK_PRE_DECREMENT; .)
         )
         unary_expression<right>                                                     /// @break
                                             (.

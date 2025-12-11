@@ -697,9 +697,12 @@ public:
     /// RAII constructor.
     ///
     /// \param factory  the node factory on which CSE will be switched on
-    explicit INLINE_scope(DAG_node_factory_impl &factory)
+    /// \param enable   TREU if inlining should be enabled, false otherwise
+    INLINE_scope(
+        DAG_node_factory_impl &factory,
+        bool                  enable)
     : m_factory(factory)
-    , m_flag(factory.enable_inline(true))
+    , m_flag(factory.enable_inline(enable))
     {
     }
 

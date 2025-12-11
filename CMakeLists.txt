@@ -105,13 +105,13 @@ if(NOT MDL_BUILD_SDK)
 endif()
 
 if(MDL_LOG_PLATFORM_INFOS)
-    MESSAGE(STATUS "[INFO] MDL_BUILD_SDK:                            ${MDL_BUILD_SDK}")
-    MESSAGE(STATUS "[INFO] MDL_BUILD_SDK_EXAMPLES:                   ${MDL_BUILD_SDK_EXAMPLES}")
-    MESSAGE(STATUS "[INFO] MDL_BUILD_CORE_EXAMPLES:                  ${MDL_BUILD_CORE_EXAMPLES}")
-    MESSAGE(STATUS "[INFO] MDL_BUILD_ARNOLD_PLUGIN:                  ${MDL_BUILD_ARNOLD_PLUGIN}")
-    MESSAGE(STATUS "[INFO] MDL_BUILD_OPENIMAGEIO_PLUGIN:             ${MDL_BUILD_OPENIMAGEIO_PLUGIN}")
-    MESSAGE(STATUS "[INFO] MDL_BUILD_DDS_PLUGIN:                     ${MDL_BUILD_DDS_PLUGIN}")
-    MESSAGE(STATUS "[INFO] MDL_ENABLE_PYTHON_BINDINGS:               ${MDL_ENABLE_PYTHON_BINDINGS}")
+    message(STATUS "[INFO] MDL_BUILD_SDK:                            ${MDL_BUILD_SDK}")
+    message(STATUS "[INFO] MDL_BUILD_SDK_EXAMPLES:                   ${MDL_BUILD_SDK_EXAMPLES}")
+    message(STATUS "[INFO] MDL_BUILD_CORE_EXAMPLES:                  ${MDL_BUILD_CORE_EXAMPLES}")
+    message(STATUS "[INFO] MDL_BUILD_ARNOLD_PLUGIN:                  ${MDL_BUILD_ARNOLD_PLUGIN}")
+    message(STATUS "[INFO] MDL_BUILD_OPENIMAGEIO_PLUGIN:             ${MDL_BUILD_OPENIMAGEIO_PLUGIN}")
+    message(STATUS "[INFO] MDL_BUILD_DDS_PLUGIN:                     ${MDL_BUILD_DDS_PLUGIN}")
+    message(STATUS "[INFO] MDL_ENABLE_PYTHON_BINDINGS:               ${MDL_ENABLE_PYTHON_BINDINGS}")
 endif()
 
 # enable CTest if requested
@@ -275,8 +275,6 @@ endforeach()
 # Config
 #--------------------------------------------------------------------------------------------------
 set(mdl_config_cmake_in_dir "${CMAKE_CURRENT_SOURCE_DIR}")
-set(_find_neuray_version 1)
-
 
 set(PATH_EXPORT_TARGETS "${CMAKE_INSTALL_DATADIR}/mdl/mdl-targets.cmake")
 configure_package_config_file(
@@ -287,14 +285,10 @@ configure_package_config_file(
     INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/mdl
 )
 
-if(_find_neuray_version)
-   file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/include/mi/neuraylib/version.h" neuraylib_product_version_line REGEX "^#define MI_NEURAYLIB_PRODUCT_VERSION_STRING ")
-
-   string(REGEX MATCHALL [[[0-9]+(\.[0-9]+)+|trunk]] neuraylib_product_version "${neuraylib_product_version_line}")
-
-   if(NOT neuraylib_product_version)
-       message(FATAL_ERROR "Unable to extract MDL-SDK product version from header.")
-   endif()
+file(STRINGS "${MDL_INCLUDE_FOLDER}/mi/neuraylib/version.h" neuraylib_product_version_line REGEX "^#define MI_NEURAYLIB_PRODUCT_VERSION_STRING ")
+string(REGEX MATCHALL [[[0-9]+(\.[0-9]+)+|trunk]] neuraylib_product_version "${neuraylib_product_version_line}")
+if(NOT neuraylib_product_version)
+    message(FATAL_ERROR "Unable to extract MDL SDK product version from header.")
 endif()
 
 write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/mdl-config-version.cmake"

@@ -147,7 +147,7 @@ const mi::neuraylib::ICompiled_material* create_distilled_material(
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1> ...]\n"
         << "-h                        print this text\n"
         << "--material_file <file>    file containing fully qualified names of materials to distill\n"
         << "--module <module_name>    distill all materials from the module, can occur multiple times\n"

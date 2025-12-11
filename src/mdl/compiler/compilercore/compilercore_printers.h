@@ -674,7 +674,7 @@ protected:
 ///
 /// Implementation of the MDL module export.
 ///
-class MDL_exporter : public Syntax_coloring<Allocator_interface_implement<IMDL_exporter> >
+class MDL_exporter MDL_FINAL : public Syntax_coloring<Allocator_interface_implement<IMDL_exporter> >
 {
     typedef Syntax_coloring<Allocator_interface_implement<IMDL_exporter> > Base;
 public:

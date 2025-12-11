@@ -26,6 +26,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #*****************************************************************************
 
+set(PROJECT_NAME imgui)
+
 set(PROJECT_VERSION 1.90.9) # cb16be3a3fc1f9cd146ae24d52b615f8a05fa93d
 
 # collect sources
@@ -75,14 +77,14 @@ if(MACOSX)
 endif()
 
 if(MDL_ENABLE_OPENGL_EXAMPLES OR MDL_ENABLE_VULKAN_EXAMPLES)
-    list(APPEND PROJECT_SOURCES_NON_DXR
+    list(APPEND PROJECT_SOURCES
         "imgui_impl_glfw.cpp"
         "imgui_impl_glfw.h"
     )
 endif()
 
 if(MDL_ENABLE_OPENGL_EXAMPLES)
-    list(APPEND PROJECT_SOURCES_NON_DXR
+    list(APPEND PROJECT_SOURCES
         "imgui_impl_opengl3.cpp"
         "imgui_impl_opengl3.h"
         "imgui_impl_opengl3_loader.h"
@@ -90,34 +92,18 @@ if(MDL_ENABLE_OPENGL_EXAMPLES)
 endif()
 
 if(MDL_ENABLE_VULKAN_EXAMPLES)
-    list(APPEND PROJECT_SOURCES_NON_DXR
+    list(APPEND PROJECT_SOURCES
         "imgui_impl_vulkan.cpp"
         "imgui_impl_vulkan.h"
     )
-endif()
-
-
-
-# name of the target and the resulting library
-#
-# This variant is used by all examples except the MDL SDK DXR example.
-set(PROJECT_NAME imgui)
-
-# Select MSVC runtime based on MDL_MSVC_DYNAMIC_RUNTIME. This is the default behavior from
-# target_build_setup(), just for consistency with DXR case below.
-if(MDL_MSVC_DYNAMIC_RUNTIME)
-    set(_IMGUI_MSVC_RUNTIME "DYNAMIC_MSVC_RUNTIME")
-else()
-    set(_IMGUI_MSVC_RUNTIME "STATIC_MSVC_RUNTIME")
 endif()
 
 # create target from template
 create_from_base_preset(
     TARGET ${PROJECT_NAME}
     VERSION ${PROJECT_VERSION}
-    SOURCES ${PROJECT_SOURCES} ${PROJECT_SOURCES_NON_DXR}
+    SOURCES ${PROJECT_SOURCES}
     EXAMPLE
-    ${_IMGUI_MSVC_RUNTIME}
 )
 
 # add include directories
@@ -159,42 +145,4 @@ if(MDL_ENABLE_VULKAN_EXAMPLES)
         PRIVATE
             "IMGUI_IMPL_VULKAN_USE_VOLK"
         )
-endif()
-
-
-
-if(MDL_ENABLE_D3D12_EXAMPLES)
-
-# name of the target and the resulting library
-#
-# This variant is used by the MDL SDK DXR example.
-set(PROJECT_NAME imgui_dxr)
-
-# Select MSVC runtime based on MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE.
-if(MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE)
-    set(_IMGUI_DXR_MSVC_RUNTIME "DYNAMIC_MSVC_RUNTIME")
-else()
-    set(_IMGUI_DXR_MSVC_RUNTIME "STATIC_MSVC_RUNTIME")
-endif()
-
-# create target from template
-create_from_base_preset(
-    TARGET ${PROJECT_NAME}
-    VERSION ${PROJECT_VERSION}
-    SOURCES ${PROJECT_SOURCES}
-    EXAMPLE
-    ${_IMGUI_DXR_MSVC_RUNTIME}
-)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES PROJECT_LABEL "imgui_dxr")
-
-# add include directories
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    )
-
-# MacOS/clang specific warning and OpenGL/Vulkan dependencies not relevant for
-# the MDL SDK DXR example.
-
 endif()

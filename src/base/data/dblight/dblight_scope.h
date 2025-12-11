@@ -78,19 +78,21 @@ class Scope_impl : public DB::Scope
 public:
     /// Constructor.
     ///
-    /// \param database        Instance of the database this scope belongs to.
-    /// \param scope_manager   Manager that creates this scope.
-    /// \param id              ID of this scope (0 for the global scope).
-    /// \param name            Name of this scope (or the empty string).
-    /// \param parent          Parent scope (or \c nullptr for the global scope).
-    /// \param level           Privacy level of the scope (0 for the global scope).
+    /// \param database              Instance of the database this scope belongs to.
+    /// \param scope_manager         Manager that creates this scope.
+    /// \param id                    ID of this scope (0 for the global scope).
+    /// \param name                  Name of this scope (or the empty string).
+    /// \param parent                Parent scope (or \c nullptr for the global scope).
+    /// \param level                 Privacy level of the scope (0 for the global scope).
+    /// \param next_transaction_id   The next transaction ID.
     Scope_impl(
         Database_impl* database,
         Scope_manager* scope_manager,
         DB::Scope_id id,
         std::string name,
         Scope_impl* parent,
-        DB::Privacy_level level);
+        DB::Privacy_level level,
+        DB::Transaction_id next_transaction_id);
 
     /// Destructor.
     virtual ~Scope_impl();
@@ -185,6 +187,33 @@ public:
     DB::Transaction_id get_journal_last_pruned_visibility() const
     { return m_journal_last_pruned_visibility; }
 
+    /// Adds an open transaction to #m_open_transactions.
+    void add_open_transaction( Transaction_impl* transaction);
+
+    /// Remove an open (actually closing) transaction from #m_open_transactions.
+    void remove_open_transaction( Transaction_impl* transaction);
+
+    /// Returns the lowest ID of all open transactions in this or any parent scope (or the ID of
+    /// the next transaction if there are no such open transactions).
+    ///
+    /// This method returns a cached value that is updated by
+    /// #Scope_manager::update_lowest_open_transaction_ids().
+    DB::Transaction_id get_lowest_open_transaction_id() const
+    { return m_lowest_open_transaction_id; }
+
+    /// Sets the lowest ID of all open transactions in this or any parent scope to \p id.
+    ///
+    /// Used by #Scope_manager::update_lowest_open_transaction_ids().
+    void set_lowest_open_transaction_id( DB::Transaction_id id)
+    { m_lowest_open_transaction_id = id; }
+
+    /// Sets the lowest ID of all open transactions in this or any parent scope.
+    ///
+    /// The new value is based on #m_open_transactions (or \p next_id if empty).
+    ///
+    /// Used by #Scope_manager::update_lowest_open_transaction_ids().
+    void update_lowest_open_transaction_id( DB::Transaction_id next_id);
+
 private:
     /// The database instance this scope belongs to.
     Database_impl* const m_database;
@@ -215,7 +244,20 @@ private:
     /// Possibly pruned journal of updates for this journal.
     Scope_journal m_journal;
     /// The visibility ID of the last pruned journal entry.
-    DB::Transaction_id m_journal_last_pruned_visibility{ ~0u};
+    DB::Transaction_id m_journal_last_pruned_visibility;
+
+    using Open_transactions_hook = bi::member_hook<
+        Transaction_impl, bi::set_member_hook<>,
+        &Transaction_impl::m_open_transactions_hook>;
+
+    /// Set of all open transactions in this scope.
+    bi::set<Transaction_impl, Open_transactions_hook> m_open_transactions;
+
+    /// The lowest ID of all open transactions in this or any parent scope (or the ID of the next
+    /// transaction if there are no such open transactions).
+    ///
+    /// Cached value, updated by #Scope_manager::update_lowest_open_transaction_ids().
+    DB::Transaction_id m_lowest_open_transaction_id;
 
 public:
     // Key for Scope_manager::m_scopes_by_id.
@@ -266,17 +308,23 @@ public:
 
     /// Creates a new scope (or retrieves an already existing named scope).
     ///
-    /// \param name     The name of the scope. The empty string creates an unnamed scope.
-    /// \param parent   The parent scope (or \c nullptr for the global scope).
-    /// \param level    Privacy level for the new scope. Must be higher than the privacy level of
-    ///                 the parent scope.
-    /// \return         The created child scope, or \c nullptr in case of failure:
-    ///                 - Missing parent scope.
-    ///                 - Privacy level not higher than that of the parent scope.
-    ///                 - A scope with that name exists already, but with different parent scope
-    ///                 and/or privacy level.
-    ///                 RCS:NEU
-    DB::Scope* create_scope( const std::string& name, DB::Scope* parent, DB::Privacy_level level);
+    /// \param name                  The name of the scope. The empty string creates an unnamed
+    ///                              scope.
+    /// \param parent                The parent scope (or \c nullptr for the global scope).
+    /// \param level                 Privacy level for the new scope. Must be higher than the
+    ///                              privacy level of the parent scope.
+    /// \param next_transaction_id   The next transaction ID.
+    /// \return                      The created child scope, or \c nullptr in case of failure:
+    ///                              - Missing parent scope.
+    ///                              - Privacy level not higher than that of the parent scope.
+    ///                              - A scope with that name exists already, but with different
+    ///                                parent scope and/or privacy level.
+    ///                              RCS:NEU
+    DB::Scope* create_scope(
+        const std::string& name,
+        DB::Scope* parent,
+        DB::Privacy_level level,
+        DB::Transaction_id next_transaction_id);
 
     /// Removes a scope from the database.
     ///
@@ -291,6 +339,11 @@ public:
     ///
     /// \param scope   The scope to remove. RCS:NEU
     void remove_scope_internal( Scope_impl* scope);
+
+    /// Updates the lowest open transaction IDs for all scopes.
+    ///
+    /// Precomputation step for the garbage collection.
+    void update_lowest_open_transaction_ids();
 
     /// Dumps the state of the scope manager to the stream.
     void dump( std::ostream& s, bool verbose, bool mask_pointer_values);

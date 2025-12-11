@@ -30,7 +30,7 @@
 #include "mdl_arnold_utils.h"
 #include "mdl_arnold.h"
 
-#include <example_shared.cpp>
+#include <utils/loading.cpp>
 #include <utils/mdl.cpp>
 
 #include <iostream>
@@ -134,7 +134,7 @@ public:
     }
 
 private:
-    Mdl_sdk_interface* m_mdl_sdk;
+    Mdl_sdk_interface* m_mdl_sdk; // unused
 };
 
 namespace
@@ -272,15 +272,14 @@ void Mdl_sdk_interface::set_search_paths()
 }
 
 Mdl_sdk_interface::Mdl_sdk_interface()
-    : m_so_handle(nullptr)
-    , m_state(EMdl_sdk_state::undefined)
+    : m_state(EMdl_sdk_state::undefined)
 {
     std::string plugin_path = get_current_binary_directory();
     AiMsgInfo("[mdl] Loaded MDL Arnold plugin from: %s", plugin_path.c_str());
 
     // load the SDK (has to be in the PATH or in the working directory, but could be changed)
-    m_mdl_sdk = load_and_get_ineuray(
-        resolve_dynamic_library(plugin_path, "libmdl_sdk_ai" MI_BASE_DLL_FILE_EXT).c_str(), &m_so_handle);
+    m_mdl_sdk = mi::examples::mdl::load_and_get_ineuray(
+        resolve_dynamic_library(plugin_path, "libmdl_sdk_ai" MI_BASE_DLL_FILE_EXT).c_str());
 
     if (!m_mdl_sdk)
     {
@@ -395,7 +394,7 @@ Mdl_sdk_interface::~Mdl_sdk_interface()
         m_mdl_sdk->shutdown();
     m_mdl_sdk = nullptr;
 
-    if (m_so_handle && !unload(m_so_handle))
+    if (mi::examples::mdl::g_dso_handle && !mi::examples::mdl::unload())
         AiMsgWarning("[mdl] Unloading the plugin failed.\n");
 }
 

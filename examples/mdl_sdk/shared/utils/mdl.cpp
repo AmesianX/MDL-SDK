@@ -33,6 +33,7 @@
 #include "utils/mdl.h"
 
 #include "utils/io.h"
+#include "utils/loading.h"
 #include "utils/os.h"
 
 namespace mi { namespace examples { namespace mdl {
@@ -44,10 +45,10 @@ bool is_examples_root(const std::string& path)
     return io::directory_exists(subdirectory);
 }
 
-// Intentionally not implemented inline which would require callers to define MDL_SAMPLES_ROOT.
+// Intentionally not implemented inline which would require callers to define MDL_EXAMPLES_ROOT.
 std::string get_examples_root()
 {
-    std::string path = mi::examples::os::get_environment("MDL_SAMPLES_ROOT");
+    std::string path = mi::examples::os::get_environment("MDL_EXAMPLES_ROOT");
     if (!path.empty())
         return io::normalize(path);
 
@@ -56,11 +57,14 @@ std::string get_examples_root()
     while (!path.empty()) {
         if (is_examples_root(path))
             return io::normalize(path);
+        std::string candidate = path + io::sep() + "share/mdl-sdk/examples";
+        if (is_examples_root(candidate))
+            return io::normalize(candidate);
         path = io::dirname(path);
     }
 
-#ifdef MDL_SAMPLES_ROOT
-    path = MDL_SAMPLES_ROOT;
+#ifdef MDL_EXAMPLES_ROOT
+    path = MDL_EXAMPLES_ROOT;
     if (is_examples_root(path))
         return io::normalize(path);
 #endif
@@ -102,7 +106,13 @@ std::string get_src_shaders_mdl()
 
 // --------------------------------------------------------------------------------------------
 
-class Default_logger : public mi::base::Interface_implement<mi::base::ILogger>
+/// Default receiving logger for the MDL SDK examples.
+///
+/// This logger is similar to the default receiving logger of the MDL SDK. The only difference is
+/// that, on Windows, it does \em not convert the UTF8 log messages to UTF16 when stderr is
+/// connected to the console. This conversion step is wrong for the MDL SDK examples, since they
+/// explicitly switch the console to UTF8.
+class Default_receiving_logger : public mi::base::Interface_implement<mi::base::ILogger>
 {
 public:
     void message(
@@ -124,7 +134,6 @@ public:
     {
         this->message(level, module_category, mi::base::Message_details(), message);
     }
-
 };
 
 // --------------------------------------------------------------------------------------------
@@ -144,15 +153,12 @@ bool configure(
     mi::base::Handle<mi::neuraylib::IMdl_configuration> mdl_config(
         neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
 
+    // set log level before the receiving logger such that if affects the startup messages
+    logging_config->set_log_level(options.log_level);
+    logging_config->set_log_level_by_category("ALL", options.log_level);
+
     // set user defined or default logger
-    if (options.logger)
-    {
-        logging_config->set_receiving_logger(options.logger);
-    }
-    else
-    {
-        logging_config->set_receiving_logger(mi::base::make_handle(new Default_logger()).get());
-    }
+    logging_config->set_receiving_logger(mi::base::make_handle(new Default_receiving_logger()).get());
     g_logger = logging_config->get_forwarding_logger();
 
     // collect the search paths to add
@@ -164,8 +170,8 @@ bool configure(
         if (example_search_path1 == "./mdl")
         {
             fprintf(stderr,
-                "MDL Examples path was not found, "
-                "consider setting the environment variable MDL_SAMPLES_ROOT.");
+                "Warning: MDL Examples path was not found, "
+                "consider setting the environment variable MDL_EXAMPLES_ROOT.\n");
         }
         mdl_paths.push_back(example_search_path1);
 
@@ -198,13 +204,13 @@ bool configure(
     if (options.skip_loading_plugins)
         return true;
 
-    if (load_plugin(neuray, "nv_openimageio" MI_BASE_DLL_FILE_EXT) != 0)
+    if (mi::examples::mdl::load_plugin(neuray, "nv_openimageio" MI_BASE_DLL_FILE_EXT) != 0)
     {
         fprintf(stderr, "Fatal: Failed to load the nv_openimageio plugin.\n");
         return false;
     }
 
-    if (load_plugin(neuray, "dds" MI_BASE_DLL_FILE_EXT) != 0)
+    if (mi::examples::mdl::load_plugin(neuray, "dds" MI_BASE_DLL_FILE_EXT) != 0)
     {
         fprintf(stderr, "Fatal: Failed to load the dds plugin.\n");
         return false;
@@ -302,5 +308,36 @@ std::string add_missing_material_signature(
     return overloads->get_c_str();
 }
 
+// --------------------------------------------------------------------------------------------
+
+std::string find_shader_file(const char* relative_directory, const char* shader_filename)
+{
+    // Location for build/install targets (next to executable).
+    std::string executable_dirname = io::get_executable_folder();
+    std::string path = executable_dirname + "/" + shader_filename;
+    if (io::file_exists(path))
+        return io::normalize(path);
+
+    // Location for examples as tools in vcpkg.
+    std::string examples_root = mdl::get_examples_root();
+    if (examples_root == ".")
+        return {};
+    path = examples_root + "/" + relative_directory + "/" + shader_filename;
+    if (io::file_exists(path))
+        return io::normalize(path);
+
+    return {};
+}
+
+// --------------------------------------------------------------------------------------------
+
+std::string read_shader_file(const char* relative_directory, const char* shader_filename)
+{
+    std::string filename = find_shader_file(relative_directory, shader_filename);
+    if (filename.empty())
+        return {};
+
+    return io::read_text_file(filename);
+}
 
 }}}

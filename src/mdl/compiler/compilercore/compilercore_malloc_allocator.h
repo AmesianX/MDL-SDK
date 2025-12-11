@@ -39,7 +39,7 @@ namespace mi {
 namespace mdl {
 
 /// A very simple allocator interface using malloc/free.
-class MallocAllocator : public mi::base::Interface_implement<mi::mdl::IAllocator>
+class MallocAllocator MDL_FINAL : public mi::base::Interface_implement<mi::mdl::IAllocator>
 {
     typedef mi::base::Interface_implement<mi::mdl::IAllocator> Base;
 public:
@@ -62,7 +62,7 @@ private:
 };
 
 /// An allocator based on new/delete.
-class NewAllocator : public mi::base::Interface_implement<mi::base::IAllocator>
+class NewAllocator MDL_FINAL : public mi::base::Interface_implement<mi::base::IAllocator>
 {
 public:
     void *malloc(mi::Size size) MDL_FINAL;

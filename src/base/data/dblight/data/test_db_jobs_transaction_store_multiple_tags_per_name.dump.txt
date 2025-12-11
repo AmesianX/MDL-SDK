@@ -1,9 +1,8 @@
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 0
 
 Count of all transactions: 1
-Count of open transactions: 1
-ID 0: pin count = 3, state = OPEN, next sequence number = 1, visibility ID = 4294967295
+ID 0: scope ID = 0, pin count = 3, state = OPEN, next sequence number = 1, visibility ID = 4294967295
 
 Count of infos by distinct names: 1
 Index 0: name = "foo", count = 1
@@ -15,14 +14,13 @@ Index 0: tag = 1, count = 1, pin count = 1, removed = 0
 
 Count of all infos: 1
 Count of infos by class IDs:
-     1 0000000000 (unknown)
+     1 0x4d796a6f "Myjo"
 
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 0
 
 Count of all transactions: 1
-Count of open transactions: 1
-ID 0: pin count = 4, state = OPEN, next sequence number = 2, visibility ID = 4294967295
+ID 0: scope ID = 0, pin count = 4, state = OPEN, next sequence number = 2, visibility ID = 4294967295
 
 Count of infos by distinct names: 1
 Index 0: name = "foo", count = 2
@@ -37,14 +35,13 @@ Index 1: tag = 2, count = 1, pin count = 1, removed = 0
 
 Count of all infos: 2
 Count of infos by class IDs:
-     2 0000000000 (unknown)
+     2 0x4d796a6f "Myjo"
 
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 1
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 0: pin count = 1, state = COMMITTED, next sequence number = 2, visibility ID = 1
+ID 0: scope ID = 0, pin count = 1, state = COMMITTED, next sequence number = 2, visibility ID = 1
 
 Count of infos by distinct names: 1
 Index 0: name = "foo", count = 2
@@ -59,5 +56,5 @@ Index 1: tag = 2, count = 1, pin count = 1, removed = 0
 
 Count of all infos: 2
 Count of infos by class IDs:
-     2 0000000000 (unknown)
+     2 0x4d796a6f "Myjo"
 

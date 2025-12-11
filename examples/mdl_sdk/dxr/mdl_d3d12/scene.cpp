@@ -1185,14 +1185,16 @@ bool Scene::build_scene(std::unique_ptr<const IScene_loader::Scene> scene)
     // ... in parallel, if not forced otherwise
     std::vector<std::thread> tasks;
     std::atomic_bool success = true;
-    std::mutex mtx;
     auto material_library = m_app->get_mdl_sdk().get_library();
     for (auto it = handled_materials.begin(); it != handled_materials.end(); ++it)
     {
+        Mdl_material* mdl_material(material_library->create_material());
+        m_materials.push_back(mdl_material);
+        it->second = mdl_material;
+
         // sequentially
         if (m_app->get_options()->force_single_threading)
         {
-            Mdl_material* mdl_material(material_library->create_material());
             if (!material_library->set_description(mdl_material,
                 it->first < m_scene_descripion->materials.size()
                     ? Mdl_material_description(
@@ -1203,15 +1205,12 @@ bool Scene::build_scene(std::unique_ptr<const IScene_loader::Scene> scene)
                 log_error("Failed to create material: " +
                     m_scene_descripion->materials[it->first].name, SRC);
             }
-            it->second = mdl_material;
-            m_materials.push_back(it->second);
         }
         // asynchronously
         else
         {
-            tasks.emplace_back(std::thread([&, it]()
+            tasks.emplace_back(std::thread([&, it, mdl_material = mdl_material]()
             {
-                Mdl_material* mdl_material(material_library->create_material());
             if (!material_library->set_description(mdl_material,
                 it->first < m_scene_descripion->materials.size()
                     ? Mdl_material_description(
@@ -1222,10 +1221,6 @@ bool Scene::build_scene(std::unique_ptr<const IScene_loader::Scene> scene)
                     log_error("Failed to create material: " +
                         m_scene_descripion->materials[it->first].name, SRC);
                 }
-                it->second = mdl_material;
-
-                std::unique_lock<std::mutex> lock(mtx);
-                m_materials.push_back(it->second);
             }));
         }
     }

@@ -61,6 +61,27 @@ target_add_dependencies(TARGET ${PROJECT_NAME}
         mdl_sdk::shared
     )
 
+# add material support
+if(MDL_ENABLE_MATERIALX)
+    target_add_dependencies(TARGET ${PROJECT_NAME}
+        DEPENDS
+            materialx
+        )
+    gather_materialx_content()
+    target_add_content(TARGET ${PROJECT_NAME}
+        FILE_BASE "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/"
+        TARGET_BASE "materialx/"
+        DEP_NAME "content_mtlx"
+        FILES ${_MATERIALX_MTLX_FILENAMES}
+        )
+    target_add_content(TARGET ${PROJECT_NAME}
+        FILE_BASE "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/mdl/materialx/"
+        TARGET_BASE "materialx/mdl/materialx/"
+        DEP_NAME "content_mdl"
+        FILES ${_MATERIALX_MDL_MODULE_FILENAMES}
+        )
+endif()
+
 # copy additional resources
 target_add_content(TARGET ${PROJECT_NAME}
     FILES ${PROJECT_RESOURCES}

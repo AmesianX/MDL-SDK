@@ -898,10 +898,13 @@ void Mdl_printer::print_value(IValue const *value, std::string const &path_prefi
             }
             break;
         }
-        if (f == float(int(f))) {
-            m_out << int(f) << ".0f";
+        std::stringstream stream;
+        stream << f;
+        std::string f_str = stream.str();
+        if (f_str.find('.') == std::string::npos && f_str.find('e') == std::string::npos) {
+            m_out << f_str << ".0f";
         } else {
-            m_out << f << "f";
+            m_out << f_str << "f";
         }
         break;
     }

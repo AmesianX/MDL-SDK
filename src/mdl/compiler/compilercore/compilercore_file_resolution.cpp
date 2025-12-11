@@ -3169,6 +3169,11 @@ MDL_import_result::MDL_import_result(
 {
 }
 
+// Destructor.
+MDL_import_result::~MDL_import_result()
+{
+}
+
 // Return the absolute MDL name of the found entity, or NULL, if the entity could not be resolved.
 char const *MDL_import_result::get_absolute_name() const
 {

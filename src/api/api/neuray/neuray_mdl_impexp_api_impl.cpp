@@ -253,7 +253,7 @@ const mi::IString* Mdl_impexp_api_impl::frame_uvtile_marker_to_string(
 const mi::IString* Mdl_impexp_api_impl::get_mdl_module_name(
     const char* filename, mi::neuraylib::IMdl_impexp_api::Search_option option) const
 {
-    if( !filename || strlen( filename) == 0)
+    if( !filename || !filename[0])
         return nullptr;
 
     std::string basename, extension;

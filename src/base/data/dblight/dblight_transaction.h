@@ -36,8 +36,9 @@
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/set.hpp>
 
-#include <base/data/db/i_db_transaction.h>
 #include <base/data/db/i_db_tag.h>
+#include <base/data/db/i_db_transaction.h>
+#include <base/data/db/i_db_transaction_wrapper.h>
 #include <base/hal/thread/i_thread_condition.h>
 
 #include "dblight_fragmented_job.h"
@@ -117,7 +118,7 @@ public:
 
     DB::Transaction_id get_id() const override { return m_id; }
 
-    DB::Scope* get_scope() override;
+    DB::Scope* get_scope() const override;
 
     /// Note that this method does \em not increment the sequence number.
     ///
@@ -539,7 +540,7 @@ private:
 public:
     /// Hook for Transaction_manager::m_all_transactions.
     bi::set_member_hook<> m_all_transactions_hook;
-    /// Hook for Transaction_manager::m_open_transactions.
+    /// Hook for Scope_impl::m_open_transactions.
     bi::set_member_hook<> m_open_transactions_hook;
 };
 
@@ -558,8 +559,13 @@ class Transaction_manager : private boost::noncopyable
 public:
     /// Constructor.
     ///
-    /// \param database   Instance of the database this manager belongs to.
-    Transaction_manager( Database_impl* database) : m_database( database) { }
+    /// \param database                  Instance of the database this manager belongs to.
+    /// \param initial_transaction_id    The first transaction ID to allocate (configurable for
+    ///                                  testing purposes).
+    Transaction_manager(
+        Database_impl* database, mi::Uint32 initial_transaction_id)
+      : m_database( database),
+        m_next_transaction_id( initial_transaction_id) { }
 
     /// Destructor.
     ///
@@ -593,9 +599,8 @@ public:
     /// \param transaction   The transaction to remove. RCS:NEU
     void remove_from_all_transactions( Transaction_impl* transaction);
 
-    /// Returns the lowest ID of all open transactions (or the ID of the next transaction if there
-    /// are no open transactions).
-    DB::Transaction_id get_lowest_open_transaction_id() const;
+    /// Returns the next transaction ID.
+    DB::Transaction_id get_next_transaction_id() const { return m_next_transaction_id; }
 
     /// Dumps the state of the transaction manager to the stream.
     void dump( std::ostream& s, bool verbose, bool mask_pointer_values);
@@ -610,16 +615,10 @@ private:
     using All_transactions_hook = bi::member_hook<
         Transaction_impl, bi::set_member_hook<>, &Transaction_impl::m_all_transactions_hook>;
 
-    using Open_transactions_hook = bi::member_hook<
-        Transaction_impl, bi::set_member_hook<>, &Transaction_impl::m_open_transactions_hook>;
-
     /// Set of all still existing transactions.
     ///
     /// Needs m_all_transactions_lock. Used only by the dump() method.
     bi::set<Transaction_impl, All_transactions_hook> m_all_transactions;
-
-    /// Set of all open transactions.
-    bi::set<Transaction_impl, Open_transactions_hook> m_open_transactions;
 
     /// ID of the next transaction to be created.
     DB::Transaction_id m_next_transaction_id;
@@ -639,6 +638,95 @@ inline void intrusive_ptr_release( Transaction_impl* transaction)
 
 /// Intrusive pointer for Transaction_impl.
 using Transaction_impl_ptr = boost::intrusive_ptr<Transaction_impl>;
+
+/// Transaction wrapper used to execute DB jobs.
+///
+/// It allows to check that jobs creating tags have the parent flag set. Furthermore, all #store()
+/// calls are converted into #store_for_reference_counting() to simplify GC handling with existing
+/// job implementations.
+class Job_transaction : public DB::Transaction_wrapper
+{
+public:
+    /// Constructor.
+    Job_transaction( DB::Transaction* transaction) : Transaction_wrapper( transaction) { }
+
+    /// Indicates whether this transaction wrapper observed any store() or
+    /// store_for_reference_counting() calls.
+    bool get_stores_observed() { return m_stores_observed; }
+
+    /// \name Overridden to keep track of any calls, and mapping of #store() to
+    ///       #store_for_reference_counting().
+    //@{
+
+    DB::Tag store(
+        DB::Element_base* element,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Privacy_level store_level = 255);
+
+    void store(
+        DB::Tag tag,
+        DB::Element_base* element,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Journal_type journal_type = DB::JOURNAL_ALL,
+        DB::Privacy_level store_level = 255);
+
+    DB::Tag store_for_reference_counting(
+        DB::Element_base* element,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Privacy_level store_level = 255);
+
+    void store_for_reference_counting(
+        DB::Tag tag,
+        DB::Element_base* element,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Journal_type journal_type = DB::JOURNAL_ALL,
+        DB::Privacy_level store_level = 255);
+
+    DB::Tag store(
+        SCHED::Job_base* job,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Privacy_level store_level = 255);
+
+    void store(
+        DB::Tag tag,
+        SCHED::Job_base* job,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Journal_type journal_type = DB::JOURNAL_NONE,
+        DB::Privacy_level store_level = 255);
+
+    DB::Tag store_for_reference_counting(
+        SCHED::Job_base* job,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Privacy_level store_level = 255);
+
+    void store_for_reference_counting(
+        DB::Tag tag,
+        SCHED::Job_base* job,
+        const char* name = nullptr,
+        DB::Privacy_level privacy_level = 0,
+        DB::Journal_type journal_type = DB::JOURNAL_NONE,
+        DB::Privacy_level store_level = 255);
+
+    //@}
+    /// \name These methods must no be called.
+    //@{
+
+    bool commit();
+
+    void abort();
+
+    //@}
+
+private:
+    bool m_stores_observed = false;
+};
 
 } // namespace DBLIGHT
 

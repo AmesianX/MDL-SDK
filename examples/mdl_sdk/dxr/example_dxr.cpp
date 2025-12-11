@@ -192,8 +192,9 @@ bool Example_dxr::initialize(Base_options* options)
     // add some MaterialX setup
     // this will probably change with a more sophisticated build integration
     // assuming relevant files have been copied manually into the build folder
-    options->mdl_paths.push_back(mi::examples::io::get_executable_folder() +
-        "/autodesk_materialx/mdl");
+    if (!options->no_mdl_std_path)
+        options->mdl_paths.push_back(mi::examples::io::get_executable_folder() +
+            "/materialx/mdl");
 #endif
 
     return true;
@@ -284,7 +285,7 @@ bool Example_dxr::load()
     }
     mi::base::Handle<const mi::neuraylib::IStruct_category> selected_type_struct_category(
         selected_type_struct->get_struct_category());
-    if (selected_type_struct_category->get_predefined_id() != 
+    if (selected_type_struct_category->get_predefined_id() !=
         mi::neuraylib::IStruct_category::CID_MATERIAL_CATEGORY)
     {
         // this example only handles types of the material_category
@@ -345,7 +346,7 @@ bool Example_dxr::load()
                     if (field_type_struct)
                     {
                         to_process.push({
-                            mi::base::make_handle_dup(field_type_struct.get()), 
+                            mi::base::make_handle_dup(field_type_struct.get()),
                             field_path
                         });
                     }
@@ -514,8 +515,8 @@ bool Example_dxr::load()
 
         // use the default texture if the environment does not exist
         if (!mi::examples::io::file_exists(env_path))
-            env_path = mi::examples::io::get_executable_folder() +
-                "/content/hdri/hdrihaven_teufelsberg_inner_2k.exr";
+            env_path = mi::examples::mdl::find_shader_file(
+                MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/hdri/hdrihaven_teufelsberg_inner_2k.exr");
 
         // load this environment
         if (!load_environment(env_path, true))
@@ -1140,7 +1141,7 @@ bool Example_dxr::update_rendering_pipeline()
         // compile miss programs
         std::vector<Shader_library> miss_libraries = compiler.compile_shader_library(
             get_options(),
-            mi::examples::io::get_executable_folder() + "/content/miss_programs.hlsl",
+            mi::examples::mdl::find_shader_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/miss_programs.hlsl"),
             nullptr, { "RadianceMissProgram", "ShadowMissProgram" });
         // add miss programs to the pipeline
         for (const auto& it : miss_libraries)
@@ -1210,7 +1211,7 @@ bool Example_dxr::update_rendering_pipeline()
             pipeline->get_global_root_signature()->register_srv(0, 0);
 
         // environment resources
-        m_global_root_signature_environment_slot = 
+        m_global_root_signature_environment_slot =
             pipeline->get_global_root_signature()->register_constants<uint32_t>(2, 0);
 
         // MDL uses a small static set of texture samplers
@@ -1673,7 +1674,7 @@ void Example_dxr::update(const Update_args& args)
 
     if (m_scene->update(args))
     {
-        scene_data.far_plane_distance = 
+        scene_data.far_plane_distance =
             m_camera_controls->get_target()->get_camera()->get_far_plane_distance();
 
         scene_data.restart_progressive_rendering();

@@ -31,15 +31,16 @@
 // Introduces the distillation of mdl materials to a fixed target model
 // and showcases how to bake material paths to a texture
 
+#include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
+#include <set>
 #include <sstream>
 #include <string>
-#include <vector>
-#include <map>
-#include <fstream>
 #include <thread>
-#include <set>
+#include <vector>
 
 #include "example_shared.h"
 #include "example_distilling_shared.h"
@@ -50,73 +51,9 @@
 float RADINV2[] = { 0, 0.5f, 0.25f, 0.75f, 0.125f, 0.625f, 0.375f, 0.875f, 0.0625f, 0.5625f, 0.3125f, 0.8125f, 0.1875f, 0.6875f, 0.4375f };
 float RADINV3[] = { 0, 0.333333f, 0.666667f, 0.111111f, 0.444444f, 0.777778f, 0.222222f, 0.555556f, 0.888889f, 0.037037f, 0.37037f, 0.703704f, 0.148148f, 0.481481f, 0.814815f };
 
-class Logger;
-mi::base::Handle<Logger> the_logger;
-class Logger : public mi::base::Interface_implement<mi::base::ILogger>
-{
-public:
-    Logger(int level)
-    {
-        set_verbosity_level(level);
-    }
-
-    void message(
-        mi::base::Message_severity level,
-        const char* /*module_category*/,
-        const mi::base::Message_details& /*details*/,
-        const char* message)
-    {
-        if (level > m_level)
-        {
-            return;
-        }
-        const char* severity = "";
-        switch (level) {
-        case mi::base::MESSAGE_SEVERITY_FATAL:        severity = "fatal: "; break;
-        case mi::base::MESSAGE_SEVERITY_ERROR:        severity = "error: "; break;
-        case mi::base::MESSAGE_SEVERITY_WARNING:      severity = "warn:  "; break;
-        case mi::base::MESSAGE_SEVERITY_INFO:         severity = "info:  "; break;
-        case mi::base::MESSAGE_SEVERITY_VERBOSE:      severity = "verbose:  "; break;
-        case mi::base::MESSAGE_SEVERITY_DEBUG:        severity = "debug:  "; break;
-        }
-
-        fprintf(stderr, "%s", severity);
-        fprintf(stderr, "%s", message);
-        putc('\n', stderr);
-
-#ifdef MI_PLATFORM_WINDOWS
-        fflush(stderr);
-#endif
-    }
-
-    void set_verbosity_level(int level)
-    {
-        if (level >= 0 && level <= 6)
-        {
-            m_level = level;
-        }
-    }
-public:
-    void log(mi::base::Message_severity level, const std::string & str)
-    {
-        message(level, "Distilling"/*module_category*/, mi::base::Message_details(), str.c_str());
-    }
-
-private:
-    // Logging level up to which messages are reported
-    // level = 0 will disable all logging
-    // level >= 1 logs fatal messages
-    // level >= 2 logs error in addition
-    // level >= 3 logs warning in addition
-    // level >= 4 logs info in addition
-    // level >= 5 logs verbose in addition
-    // level = 6 logs debug in addition
-    int  m_level = 0;
-};
+using mi::examples::mdl::g_logger;
 
 // Custom Timing output with a logger
-#include <chrono>
-#include <string>
 struct LoggerTiming
 {
     explicit LoggerTiming(std::string operation)
@@ -132,7 +69,7 @@ struct LoggerTiming
         std::stringstream strStream;
         strStream << "Finished '" << m_operation << "' after " << elapsed_seconds.count()
             << " seconds.";
-        the_logger->log(mi::base::MESSAGE_SEVERITY_INFO, strStream.str());
+        g_logger->message(mi::base::MESSAGE_SEVERITY_INFO, "DIST", strStream.str().c_str());
     }
 
 private:
@@ -264,7 +201,7 @@ bool print_messages_local(mi::neuraylib::IMdl_execution_context* context)
     for (mi::Size i = 0; i < context->get_messages_count(); ++i) {
 
         mi::base::Handle<const mi::neuraylib::IMessage> message(context->get_message(i));
-        the_logger->log(message->get_severity(), message->get_string());
+        g_logger->message(message->get_severity(), "DIST", message->get_string());
     }
     return context->get_error_messages_count() == 0;
 }
@@ -1028,15 +965,14 @@ private:
             // Build the full CUDA kernel with all the generated code
             CUfunction  cuda_function;
             char const *ptx_name = "example_distilling_unity.ptx";
+            std::string ptx_filename = mi::examples::mdl::find_shader_file(
+                MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
 
             std::vector <mi::base::Handle<const mi::neuraylib::ITarget_code>> target_codes;
             target_codes.emplace_back(m_gpu_code);
 
-            CUmodule    cuda_module = build_linked_kernel(
-                target_codes,
-                (mi::examples::io::get_executable_folder() + "/" + ptx_name).c_str(),
-                "evaluate_mat_expr",
-                &cuda_function);
+            CUmodule cuda_module = build_linked_kernel(
+                target_codes, ptx_filename.c_str(), "evaluate_mat_expr", &cuda_function);
 
             // Prepare the needed data of all target codes for the GPU
             std::vector<size_t> arg_block_indices;
@@ -1351,7 +1287,7 @@ void process_target_material(
     bool parallel,
     mi::neuraylib::IMdl_impexp_api* impexp_api)
 {
-    the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Material model: " + target_model));
+    g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", std::string("Material model: " + target_model).c_str());
 
     Canvas_exporter canvas_exporter(parallel);
     for(Material::const_iterator it = material.begin();
@@ -1366,19 +1302,19 @@ void process_target_material(
         if (param_name == "transparency" && material.has_base_color_map())
         {
             // We skip transparency if a Base Map exists since the Base Map contains transparency value
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, "Skip transparency stored in Base Map");
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", "Skip transparency stored in Base Map");
             continue;
         }
         if (param_name == "opacity" && material.has_base_color_map())
         {
             // We skip opacity if a Base Map exists since the Base Map contains opacity value combined with transparency
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, "Skip opacity stored in Base Map");
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", "Skip opacity stored in Base Map");
             continue;
         }
         if (param_name == "roughness" && material.has_mask_map())
         {
             // We skip roughness if a Mask Map exists since the Mask Map contains roughness value
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, "Skip roughness stored in Mask Map");
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", "Skip roughness stored in Mask Map");
             continue;
         }
         if (param_name == "metallic" && material.has_mask_map())
@@ -1449,11 +1385,11 @@ void process_target_material(
                 }
                 else
                 {
-                    the_logger->log(mi::base::MESSAGE_SEVERITY_WARNING, std::string("Unsupported data type"));
+                    g_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "DIST", "Unsupported data type");
                 }
                 if (!log_message.str().empty())
                 {
-                    the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, log_message.str());
+                    g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", log_message.str().c_str());
                 }
                 log_message = std::stringstream();
             }
@@ -1481,7 +1417,7 @@ void process_target_material(
         }
         if (!log_message.str().empty())
         {
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, log_message.str());
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", log_message.str().c_str());
         }
     }
 
@@ -1490,12 +1426,11 @@ void process_target_material(
 }
 
 // Prints program usage
-static void usage(const char *name)
+void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1> ...]\n"
         << "-h                      print this text\n"
-        << "--verbosity             verbosity level (0: no messages, 1: fatal, 2: error, 3: warning, 4: info, 5: verbose, 6: debug)\n"
         << "--baker_resource        baking device: gpu|cpu|gpu_with_cpu_fallback (default: cpu)\n"
         << "--samples               baking samples (default: 4, max: 16)\n"
         << "--resolution            baking resolution (default: 1024)\n"
@@ -1503,7 +1438,9 @@ static void usage(const char *name)
         << "--do_not_save_textures  if set, avoid saving baked textures to file\n"
         << "--module <module_name>  distill all materials from the module, can occur multiple times\n"
         << "--no_parallel           do not save texture files in parallel threads\n"
-        << "--mdl_path <path>       mdl search path, can occur multiple times.\n";
+        << "--mdl_path <path>       mdl search path, can occur multiple times.\n"
+        << "--fatal, --error, --warning, --info, --verbose, --debug\n"
+        << "                        sets the log level accordingly (default: verbose)\n";
 
     exit(EXIT_FAILURE);
 }
@@ -1569,14 +1506,12 @@ int MAIN_UTF8(int argc, char* argv[])
     std::vector<std::string>        module_names;
     std::string material_file;
     bool save_baked_textures(true);
-    int verbosity_level(mi::base::MESSAGE_SEVERITY_VERBOSE);
-    the_logger = new Logger(verbosity_level);
 
     mi::examples::mdl::Configure_options configure_options;
     configure_options.add_admin_space_search_paths = false;
     configure_options.add_user_space_search_paths = false;
     configure_options.add_example_search_path = false;
-    configure_options.logger = the_logger.get();
+    configure_options.log_level = mi::base::MESSAGE_SEVERITY_VERBOSE;
 
     // Collect command line arguments, if any
     for (int i = 1; i < argc; ++i) {
@@ -1625,18 +1560,18 @@ int MAIN_UTF8(int argc, char* argv[])
                 else
                     usage(argv[0]);
             }
-            else if (strcmp(opt, "--verbosity") == 0) {
-                if (i < argc - 1)
-                {
-                    int val(atoi(argv[++i]));
-                    if (val >= 0 && val <= 6)
-                        verbosity_level = val;
-                    else
-                        std::cout << "Invalid verbosity ignored\n";
-                }
-                else
-                    usage(argv[0]);
-            }
+            else if (strcmp(opt, "--fatal") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_FATAL;
+            else if (strcmp(opt, "--error") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_ERROR;
+            else if (strcmp(opt, "--warning") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_WARNING;
+            else if (strcmp(opt, "--info") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_INFO;
+            else if (strcmp(opt, "--verbose") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_VERBOSE;
+            else if (strcmp(opt, "--debug") == 0)
+                configure_options.log_level = mi::base::MESSAGE_SEVERITY_DEBUG;
             else if (strcmp(opt, "--material_file") == 0) {
                 if (i < argc - 1)
                     material_file = argv[++i];
@@ -1661,9 +1596,6 @@ int MAIN_UTF8(int argc, char* argv[])
         else
             material_names.push_back(opt);
     }
-
-    // Update verbosity level after processing command line arguments
-    the_logger->set_verbosity_level(verbosity_level);
 
     if (configure_options.additional_mdl_paths.empty())
         configure_options.add_example_search_path = true;
@@ -1800,31 +1732,27 @@ int MAIN_UTF8(int argc, char* argv[])
                 parallel,
                 mdl_impexp_api.get());
 
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Distilled material: ") + material_simple_name);
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", (std::string("Distilled material: ") + material_simple_name).c_str());
 
             n_materials_done++;
 
             std::stringstream strStream;
             strStream << "Progress: " << (float(n_materials_done) / n_materials_todo) * 100 << " % (" << n_materials_done << "/" << n_materials_todo << ")";
-            the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, strStream.str());
+            g_logger->message(mi::base::MESSAGE_SEVERITY_VERBOSE, "DIST", strStream.str().c_str());
         }
 
-        the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Transaction commit"));
         transaction->commit();
     }
 
     // Shut down the MDL SDK
-    the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Shutting down the SDK"));
     if (neuray->shutdown() != 0)
         exit_failure("Failed to shutdown the SDK.");
 
     // Unload the MDL SDK
-    the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Unloading the SDK"));
     neuray = nullptr;
     if (!mi::examples::mdl::unload())
         exit_failure("Failed to unload the SDK.");
 
-    the_logger->log(mi::base::MESSAGE_SEVERITY_VERBOSE, std::string("Exiting"));
     exit_success();
 }
 

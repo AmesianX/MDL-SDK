@@ -6130,16 +6130,22 @@ Generated_code_dag::Material_instance::Instantiate_helper::compile(
     IType const *target_type)
 {
     bool old_ignore_noinline = false;
-    bool old_inline = false;
 
-    // Ignore anno::noinline(), if requested
-    if ((m_flags & mi::mdl::IMaterial_instance::IGNORE_NOINLINE) != 0) {
-        old_ignore_noinline = m_node_factory.enable_ignore_noinline(true);
-    } else {
-        // Otherwise, deactivate inlining in general: We want instantiation as fast as possible and
-        // the material bodies were inlined during material (class) compilation.
-        old_inline = m_node_factory.enable_inline(false);
+    // By default, deactivate inlining: We want instantiation as fast as possible and
+    // the material bodies were inlined during material (class) compilation.
+    bool enable_inline = false;
+
+    if ((m_flags & mi::mdl::IMaterial_instance::RERUN_INLINING) != 0) {
+        // extra inlining pass requested
+        enable_inline = true;
     }
+    if ((m_flags & mi::mdl::IMaterial_instance::IGNORE_NOINLINE) != 0) {
+        // Ignore anno::noinline(), if requested and re-enable inlining
+        old_ignore_noinline = m_node_factory.enable_ignore_noinline(true);
+        enable_inline = true;
+    }
+
+    INLINE_scope inlining(m_node_factory, enable_inline);
 
     if (m_node_factory.is_dbg_info_enabled()) {
         // copy the file table from the code DAG to the instance (represented by its DAG_unit
@@ -6188,8 +6194,6 @@ Generated_code_dag::Material_instance::Instantiate_helper::compile(
     // Restore old node factory settings
     if ((m_flags & mi::mdl::IMaterial_instance::IGNORE_NOINLINE) != 0) {
         m_node_factory.enable_ignore_noinline(old_ignore_noinline);
-    } else {
-        m_node_factory.enable_inline(old_inline);
     }
 
     if (DAG_constant const *cnst = as<DAG_constant>(node)) {
@@ -7131,7 +7135,7 @@ Generated_code_dag::Material_instance::Instantiate_helper::instantiate_dag(
                                     m_resolver.get_owner_dag(signature.c_str()));
 
                                 res = m_dag_builder.try_inline(
-                                    owner_dag.get(), def, args.data(), n_args);
+                                    call, owner_dag.get(), def, args.data(), n_args);
 
                                 // must be analyzed when was inlined; do this here by analyzing the
                                 // inlined function
@@ -7173,7 +7177,7 @@ Generated_code_dag::Material_instance::Instantiate_helper::instantiate_dag(
     case DAG_node::EK_PARAMETER:
         {
             // Enable inlining inside the parameters.
-            INLINE_scope inline_scope(m_node_factory);
+            INLINE_scope inline_scope(m_node_factory, true);
 
             DAG_parameter const *para = cast<DAG_parameter>(node);
             int parameter_index = para->get_index();
@@ -7409,7 +7413,7 @@ Generated_code_dag::Material_instance::Instantiate_helper::instantiate_dag_argum
                                 m_resolver.get_owner_dag(signature.c_str()));
 
                             res = m_dag_builder.try_inline(
-                                owner_dag.get(), def, args.data(), n_args);
+                                call, owner_dag.get(), def, args.data(), n_args);
 
                             // must be analyzed when was inlined; do this here by analyzing the
                             // inlined function

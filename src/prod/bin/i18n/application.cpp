@@ -25,14 +25,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
+
 #include "application.h"
 #include "errors.h"
 #include "logger.h"
 #include "command.h"
 #include "util.h"
-#include "neuray_factory.h"
 #include "options.h"
 #include "search_path.h"
+
+#include <utils/loading.cpp>
 
 #include <cassert>
 #include <filesystem>
@@ -42,15 +44,12 @@
 #include <iomanip>
 #include <set>
 
-#include <mi/neuraylib/imdl_i18n_configuration.h>
-
 namespace fs = std::filesystem;
 
 using mi::base::Handle;
 using mi::base::ILogger;
 using mi::neuraylib::ILogging_configuration;
 using mi::neuraylib::INeuray;
-using mi::neuraylib::Neuray_factory;
 using mi::neuraylib::IMdl_i18n_configuration;
 using mi::neuraylib::IMdl_configuration;
 using mi::neuraylib::IPlugin_configuration;
@@ -172,19 +171,13 @@ Application & Application::theApp()
 }
 
 Application::Application()
-    : m_command(nullptr), m_factory(nullptr)
+  : m_command(nullptr)
 {
 }
 
 Application::~Application()
 {
-    // Shut down the MDL SDK
-    if (neuray())
-    {
-        check_success(neuray()->shutdown() == 0);
-    }
-    m_logger.reset();
-    delete m_factory;
+    shutdown();
 }
 
 template<class T> class Option_set_simple_value
@@ -279,8 +272,8 @@ mi::Sint32 Application::initialize(int argc, char *argv[])
     m_logger = new Logger();
 
     // Access the MDL SDK
-    m_factory = new Neuray_factory(m_logger.get());
-    check_success(m_factory->get_result_code() == Neuray_factory::RESULT_SUCCESS);
+    m_neuray = mi::examples::mdl::load_and_get_ineuray();
+    check_success(m_neuray);
 
     // Set the log level and the receiving logger
     mi::base::Handle<mi::neuraylib::ILogging_configuration> logging_configuration(
@@ -306,18 +299,15 @@ void Application::shutdown()
     {
         check_success(neuray()->shutdown() == 0);
     }
+
     m_logger.reset();
-    delete m_factory;
-    m_factory = nullptr;
+    m_neuray.reset();
+    mi::examples::mdl::unload();
 }
 
 mi::neuraylib::INeuray * Application::neuray()
 {
-    if (m_factory)
-    {
-        return m_factory->get();
-    }
-    return nullptr;
+    return m_neuray.get();
 }
 
 const mi::base::Handle<mi::base::ILogger> & Application::logger()

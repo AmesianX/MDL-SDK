@@ -166,7 +166,11 @@ public:
 /// - #mi::Float32 "fold_ternary_on_df": Fold all ternary operators of *df types, even in class
 ///   compilation mode. Default: \c false.
 /// - \c bool "ignore_noinline": If \c true, anno::noinline() annotations are ignored during
-///   material compilation. Default: \c false.
+///   material compilation. Note: This option implicitely sets the \c "rerun_inlining"
+///   option to \c true. Default: \c false.
+/// - \c bool "rerun_inlining": If \c true, enables function inlining during
+///   material compilation. Beware: This might significantly increase the compilation time.
+///   Default: \c false.
 ///
 /// Options for code generation
 /// - \c bool "fold_meters_per_scene_unit": If \c true, occurrences of the functions

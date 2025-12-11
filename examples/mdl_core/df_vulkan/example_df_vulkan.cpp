@@ -1266,7 +1266,8 @@ void Df_vulkan_app::create_accumulation_images()
 VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
 {
     std::string df_glsl_source = m_target_code->get_src_code();
-    std::string path_trace_shader_source = read_text_file(get_executable_folder() + "/" + "path_trace.comp");
+    std::string path_trace_shader_source = read_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, "path_trace.comp");
 
     std::vector<std::string> defines;
     defines.push_back("LOCAL_SIZE_X=" + std::to_string(g_local_size_x));
@@ -1311,8 +1312,8 @@ VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
 
     auto t0 = std::chrono::steady_clock::now();
     VkShaderModule shader_module = create_shader_module_from_sources(
-        m_device, { df_glsl_source, path_trace_shader_source }, EShLangCompute,
-        defines, m_options.enable_shader_optimization);
+        m_device, { df_glsl_source, path_trace_shader_source }, MDL_EXAMPLE_RELATIVE_DIRECTORY,
+        EShLangCompute, defines, m_options.enable_shader_optimization);
     auto t1 = std::chrono::steady_clock::now();
     if (!m_path_trace_pipeline) // Print only the first time
         std::cout << "Compile GLSL to SPIR-V: " << std::chrono::duration<float>(t1 - t0).count() << "s\n";
@@ -1456,9 +1457,11 @@ void Df_vulkan_app::create_pipelines()
 
     { // Create display graphics pipeline
         VkShaderModule fullscreen_triangle_vertex_shader = create_shader_module_from_file(
-            m_device, "display.vert", EShLangVertex, {}, m_options.enable_shader_optimization);
+            m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.vert", EShLangVertex, {},
+            m_options.enable_shader_optimization);
         VkShaderModule display_fragment_shader = create_shader_module_from_file(
-            m_device, "display.frag", EShLangFragment, {}, m_options.enable_shader_optimization);
+            m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.frag", EShLangFragment, {},
+            m_options.enable_shader_optimization);
 
         m_display_pipeline = create_fullscreen_triangle_graphics_pipeline(
             m_device, m_display_pipeline_layout, fullscreen_triangle_vertex_shader,
@@ -2029,19 +2032,20 @@ void Df_vulkan_app::write_accum_images_to_files()
 void print_usage(char const* prog_name)
 {
     std::cout
-        << "Usage: " << prog_name << " [options] [<material_name|full_mdle_path>]\n"
+        << "Usage: " << prog_name << " [options] [<material_name|absolute_mdle_path>]\n"
         << "Options:\n"
         << "  -h|--help                   print this text and exit\n"
-        << "  --nowin                     don't show interactive display\n"
+        << "  --no_window                 don't show interactive display\n"
         << "  --res <res_x> <res_y>       resolution (default: 1024x768)\n"
         << "  --numimg <n>                swapchain image count (default: 3)\n"
         << "  --device <id>               run on supprted GPU <id>\n"
-        << "  -o|--output <outputfile>    image file to write result in nowin mode (default: output.exr)\n"
-        << "  --spp <num>                 samples per pixel, only used for --nowin (default: 4096)\n"
+        << "  -o|--output <outputfile>    image file to write result when --no_window is used\n"
+        << "                              (default: output.exr)\n"
+        << "  --spp <num>                 samples per pixel, only used for --no_window (default: 4096)\n"
         << "  --spi <num>                 samples per render loop iteration (default: 8)\n"
         << "  --max_path_length <num>     maximum path length (default: 4)\n"
         << "  -f|--fov <fov>              the camera field of view in degrees (default: 96.0)\n"
-        << "  --cam <x> <y> <z>           set the camera position (default: 0 0 3).\n"
+        << "  --camera <x> <y> <z>        set the camera position (default: 0 0 3).\n"
         << "                              The camera will always look towards (0, 0, 0)\n"
         << "  -l|--light <x> <y> <z>      adds an omnidirectional light with the given position\n"
         << "             <r> <g> <b>      and intensity\n"
@@ -2070,14 +2074,14 @@ void print_usage(char const* prog_name)
 
 void parse_command_line(int argc, char* argv[], Options& options)
 {
-    options.additional_mdl_paths.push_back(get_samples_mdl_root());
+    options.additional_mdl_paths.push_back(get_examples_mdl_root());
 
     for (int i = 1; i < argc; ++i)
     {
         std::string arg(argv[i]);
         if (arg[0] == '-')
         {
-            if (arg == "--nowin")
+            if (arg == "--no_window")
                 options.no_window = true;
             else if (arg == "--res" && i < argc - 2)
             {
@@ -2098,7 +2102,7 @@ void parse_command_line(int argc, char* argv[], Options& options)
                 options.max_path_length = std::atoi(argv[++i]);
             else if ((arg == "-f" || arg == "--fov") && i < argc - 1)
                 options.cam_fov = static_cast<float>(std::atof(argv[++i]));
-            else if (arg == "--cam" && i < argc - 3)
+            else if (arg == "--camera" && i < argc - 3)
             {
                 options.cam_pos.x = static_cast<float>(std::atof(argv[++i]));
                 options.cam_pos.y = static_cast<float>(std::atof(argv[++i]));
@@ -2238,7 +2242,7 @@ int MAIN_UTF8(int argc, char* argv[])
         function_descs.emplace_back("surface.scattering", "mdl_bsdf");
         function_descs.emplace_back("surface.emission.emission", "mdl_edf");
         function_descs.emplace_back("surface.emission.intensity", "mdl_emission_intensity");
-        function_descs.emplace_back("volume.absorption_coefficient", "mdl_absorption_coefficient");
+        function_descs.emplace_back("volume.absorption_coefficient", "mdl_volume_absorption_coefficient");
 
         // Try to determine if the material is thin walled so we can check
         // if backface functions need to be generated.

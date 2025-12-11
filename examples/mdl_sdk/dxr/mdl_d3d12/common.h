@@ -78,7 +78,7 @@
 #include <utils/enums.h>
 #include <utils/io.h>
 #include <utils/os.h>
-#include <utils/strings.h>
+#include <utils/sdk_strings.h>
 
 #ifdef USE_PIX
 #include <pix3.h>

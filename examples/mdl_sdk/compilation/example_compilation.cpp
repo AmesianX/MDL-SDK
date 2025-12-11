@@ -34,7 +34,6 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <algorithm>
 
 #include "example_shared.h"
 

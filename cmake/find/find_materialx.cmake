@@ -26,6 +26,33 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #*****************************************************************************
 
+# Checks whether debug and/or release variant of LIB_NAME exist in ${MATERIALX_DIR}/lib
+# and adds them correspondingly to _MX_LIBS from the parent scope.
+function(ADD_MATERIALX_LIBRARY_TO_MX_LIBS LIB_NAME)
+
+    set(_LIB_DEBUG   ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${LIB_NAME}d${CMAKE_STATIC_LIBRARY_SUFFIX})
+    set(_LIB_RELEASE ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    set(_LIB_BOTH    ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${LIB_NAME}$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX})
+
+    if(EXISTS ${_LIB_DEBUG})
+        if(EXISTS ${_LIB_RELEASE})
+            set(_LIB ${_LIB_BOTH})
+        else()
+            set(_LIB ${_LIB_DEBUG})
+        endif()
+    else()
+        if(EXISTS ${_LIB_RELEASE})
+            set(_LIB ${_LIB_RELEASE})
+        else()
+            message(FATAL_ERROR "The dependency \"MaterialX\" could not be resolved. Expected library ${LIB_NAME} not found in ${MATERIALX_DIR}/lib.")
+            return()
+        endif()
+    endif()
+
+    list(APPEND _MX_LIBS ${_LIB})
+    set(_MX_LIBS ${_MX_LIBS} PARENT_SCOPE)
+endfunction()
+
 function(FIND_MATERIALX)
 
     set(MATERIALX_DIR "NOT-SPECIFIED" CACHE PATH "Path to a downloaded and extracted MaterialX pre-built package.")
@@ -36,14 +63,12 @@ function(FIND_MATERIALX)
 
         # set include dir
         set(_MX_INCLUDE ${MATERIALX_DIR}/include)
-        
+
         # set libs
-        set(_MX_LIBS
-            ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}MaterialXCore$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}
-            ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}MaterialXFormat$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}
-            ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}MaterialXGenShader$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}
-            ${MATERIALX_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}MaterialXGenMdl$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}
-        )
+        add_materialx_library_to_mx_libs(MaterialXGenMdl)
+        add_materialx_library_to_mx_libs(MaterialXGenShader)
+        add_materialx_library_to_mx_libs(MaterialXFormat)
+        add_materialx_library_to_mx_libs(MaterialXCore)
 
         # base dir to reference the standard libraries
         set(_MX_BASE_DIR ${MATERIALX_DIR})
@@ -53,9 +78,12 @@ function(FIND_MATERIALX)
         #-----------------------------------------------------------------------------------------------
 
         find_package(MaterialX)
+        # mark as advanced to avoid confusion with MATERIALX_DIR
+        mark_as_advanced(MaterialX_DIR FORCE)
+
         if(NOT ${MaterialX_FOUND})
             # Failure
-            message(FATAL_ERROR "The dependency \"MaterialX\" could not be resolved. Please install using `vcpkg`, specify 'MATERIALX_DIR' or disable 'MDL_ENABLE_MATERIALX'")
+            message(FATAL_ERROR "The dependency \"MaterialX\" could not be resolved. Please install using 'vcpkg', specify 'MATERIALX_DIR' or disable 'MDL_ENABLE_MATERIALX'")
             return()
         endif()
 
@@ -72,25 +100,52 @@ function(FIND_MATERIALX)
         get_target_property(MaterialXGenMdl_RELEASE MaterialXGenMdl IMPORTED_LOCATION_RELEASE)
 
         set(_MX_LIBS
-            $<IF:$<CONFIG:Debug>,${MaterialXCore_DEBUG},${MaterialXCore_RELEASE}>
-            $<IF:$<CONFIG:Debug>,${MaterialXFormat_DEBUG},${MaterialXFormat_RELEASE}>
-            $<IF:$<CONFIG:Debug>,${MaterialXGenShader_DEBUG},${MaterialXGenShader_RELEASE}>
             $<IF:$<CONFIG:Debug>,${MaterialXGenMdl_DEBUG},${MaterialXGenMdl_RELEASE}>
+            $<IF:$<CONFIG:Debug>,${MaterialXGenShader_DEBUG},${MaterialXGenShader_RELEASE}>
+            $<IF:$<CONFIG:Debug>,${MaterialXFormat_DEBUG},${MaterialXFormat_RELEASE}>
+            $<IF:$<CONFIG:Debug>,${MaterialXCore_DEBUG},${MaterialXCore_RELEASE}>
         )
 
         set(_MX_BASE_DIR ${MATERIALX_BASE_DIR})
     endif()
-    
+
     # store paths that are later used in the add_materialx.cmake
     set(MDL_DEPENDENCY_MATERIALX_INCLUDE ${_MX_INCLUDE} CACHE INTERNAL "materialx headers" FORCE)
     set(MDL_DEPENDENCY_MATERIALX_LIBS ${_MX_LIBS} CACHE INTERNAL "materialx libs" FORCE)
     set(MDL_DEPENDENCY_MATERIALX_BASE_DIR ${_MX_BASE_DIR} CACHE INTERNAL "materialx base dir" FORCE)
-  
+
     if(MDL_LOG_DEPENDENCIES)
-        message(STATUS "[INFO] MDL_DEPENDENCY_MATERIALX_INCLUDE:         ${MDL_DEPENDENCY_MATERIALX_INCLUDE}")
         message(STATUS "[INFO] MDL_DEPENDENCY_MATERIALX_INCLUDE:         ${MDL_DEPENDENCY_MATERIALX_INCLUDE}")
         message(STATUS "[INFO] MDL_DEPENDENCY_MATERIALX_LIBS:            ${MDL_DEPENDENCY_MATERIALX_LIBS}")
         message(STATUS "[INFO] MDL_DEPENDENCY_MATERIALX_BASE_DIR:        ${MDL_DEPENDENCY_MATERIALX_BASE_DIR}")
     endif()
+
+endfunction()
+
+
+# Finds all mtlx libraries and MDL support modules in the MaterialX SDK and returns them as
+# _MATERIALX_MTLX_FILENAMES and _MATERIALX_MDL_MODULE_FILENAMES in the parent scope.
+function(GATHER_MATERIALX_CONTENT)
+
+    set(_MATERIALX_MTLX_FILENAMES "")
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/*.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/genmdl/*.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/lama/*.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/translation/*.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/*_defs.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/*_ng.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/genmdl/*_impl.mtlx")
+    list(APPEND _MATERIALX_MTLX_FILENAMES ${_PATHS})
+    list(APPEND _MATERIALX_MTLX_FILENAMES "libraries/targets/genmdl.mtlx")
+    set(_MATERIALX_MTLX_FILENAMES ${_MATERIALX_MTLX_FILENAMES} PARENT_SCOPE)
+
+    file(GLOB _MATERIALX_MDL_MODULE_FILENAMES RELATIVE "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/mdl/materialx" "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/mdl/materialx/*.mdl")
+    set(_MATERIALX_MDL_MODULE_FILENAMES ${_MATERIALX_MDL_MODULE_FILENAMES} PARENT_SCOPE)
 
 endfunction()

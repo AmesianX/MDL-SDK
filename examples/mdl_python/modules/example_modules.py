@@ -50,7 +50,7 @@ def get_examples_search_path():
     """Try to get the example search path or returns 'mdl' sub folder of the current directory if it failed."""
 
     # get the environment variable that is used in all MDL SDK examples
-    example_sp = os.getenv('MDL_SAMPLES_ROOT')
+    example_sp = os.getenv('MDL_EXAMPLES_ROOT')
 
     # fall back to a path relative to this script file
     if example_sp == None or not os.path.exists(example_sp):

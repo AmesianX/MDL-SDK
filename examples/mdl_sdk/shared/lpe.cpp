@@ -781,7 +781,7 @@ void LPE_state_machine::build()
             std::cout << "\n" << e.first.c_str() 
                       << "\ninput:\n" << e.second.print().c_str() << std::endl;
 
-        expanded.emplace_back(std::move(e.second.expand(global_tags)));
+        expanded.emplace_back(e.second.expand(global_tags));
 
         if (print_debug_output)
             std::cout << "\nexpanded:\n" << expanded.back().print().c_str() << std::endl;

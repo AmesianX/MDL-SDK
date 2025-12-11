@@ -36,11 +36,11 @@
 
 // To reuse this sample code for the MDL SDK and MDL Core the corresponding namespaces are used.
 
-// when this CUDA code is used in the context of an SDK sample.
+// when this CUDA code is used in the context of an SDK example.
 #if defined(MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR
     using namespace mi::neuraylib;
-// when this CUDA code is used in the context of an Core sample.
+// when this CUDA code is used in the context of an Core example.
 #elif defined(MDL_CORE_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MDL_CORE_BSDF_USE_MATERIAL_IOR
     using namespace mi::mdl;
@@ -673,7 +673,7 @@ __device__ inline bool trace_sphere(
                 as_bsdf_evaluate(func_idx)(
                     &eval_data, &state, &mdl_resources.data, arg_block);
 
-                ray_state.contribution += ray_state.weight * f * 
+                ray_state.contribution += ray_state.weight * f *
                                           (eval_data.bsdf_diffuse + eval_data.bsdf_glossy);
             }
         }
@@ -702,7 +702,7 @@ __device__ inline bool trace_sphere(
 
                 const float mis_weight =
                     (params.mdl_test_type == MDL_TEST_EVAL) ? 1.0f : pdf / (pdf + eval_data.pdf);
-                ray_state.contribution += ray_state.weight * f * mis_weight * 
+                ray_state.contribution += ray_state.weight * f * mis_weight *
                                           (eval_data.bsdf_diffuse + eval_data.bsdf_glossy);
             }
         }

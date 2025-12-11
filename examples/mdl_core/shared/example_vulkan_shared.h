@@ -75,9 +75,11 @@ using Float32_4 = mi::math::Vector<float, 4>;
 class Glsl_compiler
 {
 public:
-    Glsl_compiler(EShLanguage shader_type, const char* entry_point = "main")
+    Glsl_compiler(
+        const char* relative_directory, EShLanguage shader_type, const char* entry_point = "main")
         : m_shader_type(shader_type)
         , m_entry_point(entry_point)
+        , m_file_includer(relative_directory)
     {
     }
 
@@ -97,6 +99,9 @@ private:
     class Simple_file_includer : public glslang::TShader::Includer
     {
     public:
+        Simple_file_includer(const char* relative_directory)
+          : m_relative_directory(relative_directory) { }
+
         virtual ~Simple_file_includer() = default;
 
         virtual IncludeResult* includeSystem(const char* header_name,
@@ -104,6 +109,8 @@ private:
         virtual IncludeResult* includeLocal(const char* header_name,
             const char* includer_name, size_t inclusion_depth) override;
         virtual void releaseInclude(IncludeResult* include_result) override;
+    private:
+        std::string m_relative_directory;
     };
 
 private:
@@ -144,12 +151,12 @@ public:
 
 protected:
     // The callback for initializing all rendering related resources. Is called
-    // after all resources (device, swapchain, etc.) of this base class are 
+    // after all resources (device, swapchain, etc.) of this base class are
     // initialized.
     virtual void init_resources() {}
 
     // The callback for destroying all rendering related resources. Is called
-    // before all resources (device, swapchain, etc.) of this base class are 
+    // before all resources (device, swapchain, etc.) of this base class are
     // destroyed.
     virtual void cleanup_resources() {}
 
@@ -364,11 +371,13 @@ bool check_validation_layers_support(
 
 // Shader compilation helpers
 VkShaderModule create_shader_module_from_file(
-    VkDevice device, const char* shader_filename, EShLanguage shader_type,
+    VkDevice device, const char* relative_directory, const char* shader_filename,
+    EShLanguage shader_type,
     const std::vector<std::string>& defines = {}, bool optimize = true);
 
 VkShaderModule create_shader_module_from_sources(
-    VkDevice device, const std::vector<std::string_view> shader_sources, EShLanguage shader_type,
+    VkDevice device, const std::vector<std::string_view> shader_sources,
+    const char* relative_directory, EShLanguage shader_type,
     const std::vector<std::string>& defines = {}, bool optimize = true);
 
 

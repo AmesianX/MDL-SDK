@@ -36,7 +36,6 @@ set(PROJECT_HEADERS
     "command.h"
     "errors.h"
     "logger.h"
-    "neuray_factory.h"
     "options.h"
     "search_path.h"
     "util.h"
@@ -66,6 +65,13 @@ create_from_base_preset(
     EMBED_RC "../../../base/system/main/mdl_core_sdk.rc"
     SOURCES ${PROJECT_SOURCES}
 )
+
+# add include directory for utils/loading.cpp explicitly to avoid a dependency on the entire
+# mdl_sdk::shared target
+target_include_directories(
+    ${PROJECT_NAME}
+    PRIVATE ${MDL_EXAMPLES_FOLDER}/mdl_sdk/shared
+    )
 
 # add dependencies
 target_add_dependencies(TARGET ${PROJECT_NAME}

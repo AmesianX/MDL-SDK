@@ -311,7 +311,7 @@ mi::Sint32 Module_impl::reload_from_string(
 {
     MDL::Execution_context default_context;
     MDL::Execution_context* ctx = unwrap_and_clear_context( context, default_context);
-    if( !module_source || strlen( module_source) == 0) {
+    if( !module_source || !module_source[0]) {
         MDL::add_error_message( ctx, "Module source cannot be empty.", -1);
         return -1;
     }

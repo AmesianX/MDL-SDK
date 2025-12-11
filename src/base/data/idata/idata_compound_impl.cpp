@@ -460,9 +460,7 @@ void Vector_impl<I,T,ROWS>::set_value( const mi::math::Vector_struct<T,ROWS>& va
 template <typename I, typename T, mi::Size ROWS>
 bool Vector_impl<I,T,ROWS>::key_to_index( const char* key, mi::Size& index) const
 {
-    if( !key)
-        return false;
-    if( strlen( key) != 1)
+    if( !key || !key[0] || key[1])
         return false;
 
     if( (key[0] == 'x')               ) { index = 0; return true; }
@@ -527,9 +525,7 @@ void Matrix_impl<I,T,ROWS,COLUMNS>::set_value(
 template <typename I, typename T, mi::Size ROWS, mi::Size COLUMNS>
 bool Matrix_impl<I,T,ROWS,COLUMNS>::key_to_index( const char* key, mi::Size& index) const
 {
-    if( !key)
-        return false;
-    if( strlen( key) != 2)
+    if( !key || !key[0] || !key[1] || key[2])
         return false;
 
     int tmp = -1;

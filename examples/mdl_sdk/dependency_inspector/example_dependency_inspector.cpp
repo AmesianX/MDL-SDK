@@ -63,7 +63,7 @@ public:
     /// Listing options.
     int m_dependency_options = DEPENDENCY_ALL;
     bool m_recursive = false; // scan modules recursively.
-    
+
     /// General options.
     bool m_nostdpath = false;
     std::vector<std::string> m_mdl_paths;
@@ -84,7 +84,7 @@ public:
 private:
     // List the dependencies of MDL module and optionally from its imports (recursively).
     void list_dependencies( const mi::neuraylib::IModule* module);
-    
+
     // Check if the filename contains embedded resources notation
     // from MDR or MDLE modules and cuts it away.
     const std::string get_resolved_filename(const char* filename);
@@ -94,7 +94,7 @@ private:
 
     mi::neuraylib::INeuray* m_neuray;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
-    
+
     Options m_options;
 
     // List of modules already visited.
@@ -191,7 +191,7 @@ void Dependency_inspector::list_dependencies( const mi::neuraylib::IModule* modu
                 for (mi::Size f = 0, fn = image->get_length(); f < fn; ++f)
                     for (mi::Size t = 0, tn = image->get_frame_length(f); t < tn; ++t)
                     {
-                        const std::string resolved_filename = 
+                        const std::string resolved_filename =
                             get_resolved_filename(image->get_filename(f, t));
                         if (!resolved_filename.empty() && !was_listed(resolved_filename))
                             std::cout << resolved_filename << std::endl;
@@ -332,7 +332,7 @@ options:
 
   -h|--help                 Print this usage message and exit.
   -p|--mdl_path <path>      Add the given path to the MDL search path.
-  -n|--nostdpath            Prevent adding the MDL system and user search
+  -n|--nostdpath            Prevent adding the MDL system, user, and example search
                             path(s) to the MDL search path.
   -d|--dependencies         Select type of dependencies to be listed.
                               Format: -d "type1|type2|...|typeN".

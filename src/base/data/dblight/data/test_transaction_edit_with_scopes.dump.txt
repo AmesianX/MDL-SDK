@@ -1,23 +1,21 @@
 Count of all scopes: 3
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
-ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0
-ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 0
+ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0, lowest open transaction ID = 0
+ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0, lowest open transaction ID = 0
 
 Count of all transactions: 0
-Count of open transactions: 0
 Count of infos by distinct names: 0
 Count of infos by distinct tags: 0
 Count of all infos: 0
 Count of infos by class IDs:
 
 Count of all scopes: 3
-ID 0: name = (null), pin count = 3, level = 0, parent ID = (null), removed = 0
-ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0
-ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0
+ID 0: name = (null), pin count = 3, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 1
+ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0, lowest open transaction ID = 1
+ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0, lowest open transaction ID = 1
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 0: pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 1
+ID 0: scope ID = 0, pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 1
 
 Count of infos by distinct names: 5
 Index 0: name = "foo1", count = 1
@@ -48,13 +46,12 @@ Count of infos by class IDs:
      5 0x4d79656c "Myel"
 
 Count of all scopes: 3
-ID 0: name = (null), pin count = 3, level = 0, parent ID = (null), removed = 0
-ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0
-ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0
+ID 0: name = (null), pin count = 3, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 2
+ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0, lowest open transaction ID = 2
+ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0, lowest open transaction ID = 2
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 1: pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 2
+ID 1: scope ID = 0, pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 2
 
 Count of infos by distinct names: 5
 Index 0: name = "foo1", count = 1
@@ -85,13 +82,12 @@ Count of infos by class IDs:
      5 0x4d79656c "Myel"
 
 Count of all scopes: 3
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
-ID 1: name = (null), pin count = 3, level = 10, parent ID = 0, removed = 0
-ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 3
+ID 1: name = (null), pin count = 3, level = 10, parent ID = 0, removed = 0, lowest open transaction ID = 3
+ID 2: name = (null), pin count = 1, level = 20, parent ID = 1, removed = 0, lowest open transaction ID = 3
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 2: pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 3
+ID 2: scope ID = 1, pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 3
 
 Count of infos by distinct names: 5
 Index 0: name = "foo1", count = 1
@@ -128,13 +124,12 @@ Count of infos by class IDs:
      8 0x4d79656c "Myel"
 
 Count of all scopes: 3
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
-ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0
-ID 2: name = (null), pin count = 2, level = 20, parent ID = 1, removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 4
+ID 1: name = (null), pin count = 2, level = 10, parent ID = 0, removed = 0, lowest open transaction ID = 4
+ID 2: name = (null), pin count = 2, level = 20, parent ID = 1, removed = 0, lowest open transaction ID = 4
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 3: pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 4
+ID 3: scope ID = 2, pin count = 1, state = COMMITTED, next sequence number = 5, visibility ID = 4
 
 Count of infos by distinct names: 5
 Index 0: name = "foo1", count = 1

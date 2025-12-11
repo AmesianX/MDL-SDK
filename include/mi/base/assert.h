@@ -74,7 +74,7 @@ namespace base {
 /// You may define the macro #mi_static_assert(expr) yourself to customize its behavior, for
 /// example, to disable it.
 #ifndef mi_static_assert
-#ifdef MI_COMPILER_GCC
+#if defined(MI_COMPILER_GCC) || defined(MI_COMPILER_CLANG)
 #define mi_static_assert_attribute __attribute__((unused))
 #else
 #define mi_static_assert_attribute

@@ -293,7 +293,7 @@ const mi::IString* Mdl_factory_impl::decode_name( const char* name)
         return nullptr;
 
     std::string result = MDL::decode( name, /*strict*/ false);
-    if( result.empty() && strlen( name) > 0)
+    if( result.empty() && name[0])
         return nullptr;
 
     return new String_impl( result.c_str());

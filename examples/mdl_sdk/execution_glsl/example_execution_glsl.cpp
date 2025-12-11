@@ -225,22 +225,23 @@ static GLuint create_shader_program(
 
     GLuint program = glCreateProgram();
 
-    add_shader(GL_VERTEX_SHADER,
-        read_text_file(
-            mi::examples::io::get_executable_folder() + "/" + vertex_shader_filename), program);
+    std::string vertex_shader_source = mi::examples::mdl::read_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, vertex_shader_filename);
+    add_shader(GL_VERTEX_SHADER, vertex_shader_source, program);
 
     std::stringstream sstr;
     sstr << (use_ssbo ? "#version 430 core\n" : "#version 330 core\n");
     sstr << "#define MAX_MATERIALS " << to_string(max_materials) << "\n";
     sstr << "#define MAX_TEXTURES "  << to_string(max_textures) << "\n";
-    sstr << read_text_file(
-        mi::examples::io::get_executable_folder() + "/" + fragment_shader_filename);
+    sstr << mi::examples::mdl::read_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, fragment_shader_filename);
     add_shader(GL_FRAGMENT_SHADER, sstr.str() , program);
 
     std::string code(target_code->get_code());
     if (remap_noise_functions) {
-        code.append(read_text_file(
-            mi::examples::io::get_executable_folder() + "/" + "noise_no_lut.glsl"));
+        std::string noise_shader_source =  mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
+        code.append(noise_shader_source);
     }
 
     add_shader(GL_FRAGMENT_SHADER, code, program);
@@ -687,7 +688,7 @@ bool Material_opengl_context::set_material_data(unsigned max_textures)
                     &m_material_texture_starts[0]);
             }
         } else {
-            fprintf(stderr, "Sample requires Bindless Textures, "
+            fprintf(stderr, "Example requires Bindless Textures, "
                 "that are not supported by the current system.\n");
             return false;
         }
@@ -1075,12 +1076,13 @@ static void usage(char const *prog_name, bool default_ssbo)
     std::cout
         << "Usage: " << prog_name << " [options] [<material_pattern>]\n"
         << "Options:\n"
-        << "  --nowin             don't show interactive display\n"
+        << "  --no_window         don't show interactive display\n"
         << "  --res <x> <y>       resolution (default: 1024x768)\n"
         << "  --with-ssbo         Enable SSBO" << (default_ssbo ? " (default)\n" : "\n")
         << "  --no-ssbo           Disable SSBO" << (!default_ssbo ? " (default)\n" : "\n")
         << "  --no-noise-remap    Do not remap MDL ::base noise functions\n"
-        << "  -o <outputfile>     image file to write result in nowin mode (default: output.png)\n"
+        << "  -o <outputfile>     image file to write result when --no_window is used (default:\n"
+        << "                      output.png)\n"
         << "  <material_pattern>  a number from 1 to 7 choosing which material combination to use"
         << std::endl;
     exit_failure();
@@ -1102,7 +1104,7 @@ int MAIN_UTF8(int argc, char* argv[])
     for (int i = 1; i < argc; ++i) {
         char const *opt = argv[i];
         if (opt[0] == '-') {
-            if (strcmp(opt, "--nowin") == 0) {
+            if (strcmp(opt, "--no_window") == 0) {
                 options.no_window = true;
             } else if (strcmp(opt, "-o") == 0) {
                 if (i < argc - 1) {

@@ -265,7 +265,7 @@ void log_api_package(const IMdl_info* info, int level)
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options]\n"
+        << "Usage: " << name << " [options]\n"
         << "--help, -h            print this text\n"
         << "--filter, -f <kind>   discovery filter, can occur multiple times\n"
         << "                      Valid values are: DK_PACKAGE DK_MODULE DK_XLIFF DK_TEXTURE\n"

@@ -98,22 +98,12 @@ set(PROJECT_SOURCES
 if(MDL_ENABLE_MATERIALX)
     set(PROJECT_SOURCES
         ${PROJECT_SOURCES}
-        "mdl_d3d12/materialx/mdl_generator.h"
-        "mdl_d3d12/materialx/mdl_generator.cpp"
         "mdl_d3d12/materialx/mdl_material_description_loader_mtlx.h"
         "mdl_d3d12/materialx/mdl_material_description_loader_mtlx.cpp"
     )
 endif()
 
 # -------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------
-
-# Select MSVC runtime based on MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE.
-if(MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE)
-    set(_SHARED_DXR_MSVC_RUNTIME "DYNAMIC_MSVC_RUNTIME")
-else()
-    set(_SHARED_DXR_MSVC_RUNTIME "STATIC_MSVC_RUNTIME")
-endif()
 
 # create target from template
 create_from_base_preset(
@@ -127,16 +117,15 @@ create_from_base_preset(
         "../../thirdparty/d3dx12"
         "../../thirdparty/gltf"
     EXAMPLE
-    ${_SHARED_DXR_MSVC_RUNTIME}
 )
 
 # add dependencies
 target_add_dependencies(TARGET ${PROJECT_NAME}
     DEPENDS
         d3d12
-        imgui_dxr
+        imgui
         mdl::mdl_sdk
-        mdl_sdk::shared_dxr
+        mdl_sdk::shared
     )
 
 # copy content
@@ -168,65 +157,32 @@ target_add_content(TARGET ${PROJECT_NAME}
         "content/fonts/NotoSansThai-Medium.ttf"
     )
 
-if(MDL_ENABLE_MATERIALX)
 # add material support
+if(MDL_ENABLE_MATERIALX)
     target_add_dependencies(TARGET ${PROJECT_NAME}
         DEPENDS
             materialx
         )
-
-    target_compile_definitions(${PROJECT_NAME}
-        PRIVATE
-            "MDL_ENABLE_MATERIALX"
-        )
-
-    # find all mtlx libraries in the MaterialX SDK
-    set(_MATERIALX_LIB_FILENAMES "")
-    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/*/*.mtlx")
-    list(APPEND _MATERIALX_LIB_FILENAMES ${_PATHS})
-    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/bxdf/*.mtlx")
-    list(APPEND _MATERIALX_LIB_FILENAMES ${_PATHS})
-    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/*_defs.mtlx")
-    list(APPEND _MATERIALX_LIB_FILENAMES ${_PATHS})
-    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/*_ng.mtlx")
-    list(APPEND _MATERIALX_LIB_FILENAMES ${_PATHS})
-    file(GLOB _PATHS RELATIVE ${MDL_DEPENDENCY_MATERIALX_BASE_DIR} "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/*/genmdl/*_impl.mtlx")
-    list(APPEND _MATERIALX_LIB_FILENAMES ${_PATHS})
-    list(APPEND _MATERIALX_LIB_FILENAMES "libraries/targets/genmdl.mtlx")
+    gather_materialx_content()
     target_add_content(TARGET ${PROJECT_NAME}
         FILE_BASE "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/"
-        TARGET_BASE "autodesk_materialx/"
+        TARGET_BASE "materialx/"
         DEP_NAME "content_mtlx"
-        FILES ${_MATERIALX_LIB_FILENAMES}
+        FILES ${_MATERIALX_MTLX_FILENAMES}
         )
-
-    # find all support modules from the MaterialX SDK
-    set(_MATERIALX_MDL_MODULE_FILENAMES "")
-    file(GLOB _MATERIALX_MDL_MODULE_PATHS "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/mdl/materialx/*.mdl")
-    foreach(_MODULE_PATH ${_MATERIALX_MDL_MODULE_PATHS})
-        get_filename_component(_MODULE_FILENAME ${_MODULE_PATH} NAME)
-        list(APPEND _MATERIALX_MDL_MODULE_FILENAMES ${_MODULE_FILENAME})
-    endforeach()
-
     target_add_content(TARGET ${PROJECT_NAME}
         FILE_BASE "${MDL_DEPENDENCY_MATERIALX_BASE_DIR}/libraries/mdl/materialx/"
-        TARGET_BASE "autodesk_materialx/mdl/materialx/"
+        TARGET_BASE "materialx/mdl/materialx/"
         DEP_NAME "content_mdl"
         FILES ${_MATERIALX_MDL_MODULE_FILENAMES}
         )
-
 endif()
 
-if(MDL_ENABLE_SLANG)
 # add slang support
+if(MDL_ENABLE_SLANG)
     target_add_dependencies(TARGET ${PROJECT_NAME}
         DEPENDS
             slang
-        )
-
-    target_compile_definitions(${PROJECT_NAME}
-        PRIVATE
-            "MDL_ENABLE_SLANG"
         )
 endif()
 

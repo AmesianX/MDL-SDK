@@ -441,23 +441,28 @@ public:
     /// \param call_evaluator      the call evaluator for handling some intrinsics
     /// \param func_decl           a function represented by its declaration
     /// \param call                a call-site of this function
-    /// \param forbid_local_calls  if set, calls to local functions are forbidden
     /// \param tmp_value_map       map of argument values
+    /// \param forbid_local_calls  if set, calls to local functions are forbidden
+    /// \param warn_if_fails       if set, a warning is emitted if inlining fails
     Inline_checker(
         IModule const                          *module,
         IValue_factory                         *value_factory,
         ICall_evaluator const                  *call_evaluator,
         IDeclaration_function const            *func_decl,
         IExpression_call const                 *call,
+        DAG_builder::Definition_temporary_map  &tmp_value_map,
         bool                                   forbid_local_calls,
-        DAG_builder::Definition_temporary_map  &tmp_value_map)
+        bool                                   warn_if_fails)
     : m_module(module)
     , m_value_factory(value_factory)
     , m_func_decl(func_decl)
     , m_call(call)
     , m_arg_types(NULL)
-    , m_forbid_local_calls(forbid_local_calls)
     , m_var_lookup_handler(module, value_factory, call_evaluator, tmp_value_map)
+    , m_call_pos(NULL)
+    , m_call_dbg(DAG_DbgInfo())
+    , m_forbid_local_calls(forbid_local_calls)
+    , m_warn_if_fails(warn_if_fails || true)
     , m_skip_flags(INL_NO_SKIP)
     {
     }
@@ -469,31 +474,46 @@ public:
     /// \param call_evaluator      the call evaluator for handling some intrinsics
     /// \param func_decl           a function represented by its declaration
     /// \param arg_types           list of argument types of the call site
-    /// \param forbid_local_calls  if set, calls to local functions are forbidden
     /// \param tmp_value_map       map of argument values
+    /// \param forbid_local_calls  if set, calls to local functions are forbidden
+    /// \param warn_if_fails       if set, a warning is emitted if inlining fails
     Inline_checker(
         IModule const                          *module,
         IValue_factory                         *value_factory,
         ICall_evaluator const                  *call_evaluator,
         IDeclaration_function const            *func_decl,
         Type_vector const                      &arg_types,
+        DAG_builder::Definition_temporary_map  &tmp_value_map,
         bool                                   forbid_local_calls,
-        DAG_builder::Definition_temporary_map  &tmp_value_map)
+        bool                                   warn_if_fails)
     : m_module(module)
     , m_value_factory(value_factory)
     , m_func_decl(func_decl)
     , m_call(NULL)
     , m_arg_types(&arg_types)
-    , m_forbid_local_calls(forbid_local_calls)
     , m_var_lookup_handler(module, value_factory, call_evaluator, tmp_value_map)
+    , m_call_pos(NULL)
+    , m_call_dbg(DAG_DbgInfo())
+    , m_forbid_local_calls(forbid_local_calls)
+    , m_warn_if_fails(warn_if_fails)
     , m_skip_flags(INL_NO_SKIP)
     {
     }
 
-    /// Check if we support inlining the current function at the given call-site
-    bool can_inline();
+    /// Check if we support inlining the current function at the given call-site.
+    ///
+    /// \param pos  the position of the call site
+    bool can_inline(Position const *pos);
+
+    /// Check if we support inlining the current function at the given call-site.
+    ///
+    /// \param dbg_info  the debug info of the call site
+    bool can_inline(DAG_DbgInfo dbg_info);
 
 private:
+    /// Check if we support inlining the current function at the given call-site.
+    bool can_inline();
+
     /// Check if we support inlining of the given expression.
     ///
     /// \param expr  the expression to check
@@ -529,6 +549,30 @@ private:
     /// \param expr  the target expression
     bool is_allowed_assign_target(IExpression const *expr);
 
+    enum Warning_code  {
+        WC_NESTED_LOOPS_NOT_ALLOWED = 1,  ///< Cannot inline nested loops.
+        WC_FOR_INIT_NOT_A_VAR_DECL,       ///< For init is not a variable declaration.
+        WC_SEVERAL_ITERATION_VARIABLES,   ///< For loop has several iteration variables.
+        WC_ITERATION_START_NOT_CONSTANT,  ///< Iteration variable start value is not a constant.
+        WC_ITERATION_UPDATE_NOT_CONSTANT, ///< Iteration variable update is not a constant.
+        WC_LOOP_EXCEED_MAX_STEPS,         ///< Loop exceeded max steps.
+        WC_STMT_NOT_SUPPORTED,            ///< Statement is not supported.
+        WC_COMPLEX_ASSIGNMENT,            ///< Complex assignment not supported.
+        WC_LAZY_EVALUATION,               ///< Lazy evaluation not supported.
+        WC_CONDITION_NOT_UNIFORM,         ///< Ternary operator condition is not uniform.
+        WC_SIDE_EFFECT_CALL,              ///< Call has side effect.
+        WC_FORBIDDEN_CALL_TO_LOCAL,       ///< Inlining call to local function is forbidden.
+        WC_CONDITION_NOT_CONSTANT,        ///< Condition is not constant.
+    };
+
+    /// Emit a warning.
+    ///
+    /// \param warning  the warning to emit
+    /// \param pos      if non NULL, the position of the warning
+    void warning(
+        Warning_code   warning,
+        Position const *pos);
+
 private:
     /// The module used for folding values.
     IModule const *m_module;
@@ -545,12 +589,21 @@ private:
     /// The call site argument types or NULL.
     Type_vector const      *m_arg_types;
 
-    /// If set, calls to local functions are forbidden.
-    bool m_forbid_local_calls;
 
     /// Handler for looking up variables during constant folding.
     Variable_lookup_handler m_var_lookup_handler;
 
+    /// If non-NULL, the call site position.
+    Position const *m_call_pos;
+
+    /// If non-empty, the call site debug info.
+    DAG_DbgInfo m_call_dbg;
+
+    /// If set, calls to local functions are forbidden.
+    bool m_forbid_local_calls;
+
+    /// If set, a warning is emitted if inlining fails.
+    bool m_warn_if_fails;
 
     enum Inline_skip_flag
     {
@@ -574,6 +627,65 @@ bool Inline_checker::is_allowed_assign_target(IExpression const *expr)
     return is_simple_select_expr(expr);
 }
 
+
+// Emit a warning.
+void Inline_checker::warning(
+    Warning_code   warning,
+    Position const *pos)
+{
+#if 0
+    printf("Warning: ");
+    if (m_call_pos != NULL) {
+        printf("Calling from %s line %u: ", m_module->get_name(), m_call_pos->get_start_line());
+    } else if (!m_call_dbg.empty()) {
+        printf("Calling from %s line %u: ", m_module->get_name(), m_call_dbg.get_line());
+    }
+    switch (warning) {
+    case WC_NESTED_LOOPS_NOT_ALLOWED:
+        printf("Nested loops are not allowed at line %u\n", pos->get_start_line());
+        break;
+    case WC_FOR_INIT_NOT_A_VAR_DECL:
+        printf("For init is not a variable declaration at line %u\n", pos->get_start_line());
+        break;
+    case WC_SEVERAL_ITERATION_VARIABLES:
+        printf("For loop has several iteration variables at line %u\n", pos->get_start_line());
+        break;
+    case WC_ITERATION_START_NOT_CONSTANT:
+        printf("Iteration variable start value is not a constant at line %u\n", pos->get_start_line());
+        break;
+    case WC_ITERATION_UPDATE_NOT_CONSTANT:
+        printf("Iteration variable update is not a constant at line %u\n", pos->get_start_line());
+        break;
+    case WC_LOOP_EXCEED_MAX_STEPS:
+        printf("Loop exceeded max steps at line %u\n", pos->get_start_line());
+        break;
+    case WC_STMT_NOT_SUPPORTED:
+        printf("Statement is not supported at line %u\n", pos->get_start_line());
+        break;
+    case WC_COMPLEX_ASSIGNMENT:
+        printf("Complex assignment not supported at line %u\n", pos->get_start_line());
+        break;
+    case WC_LAZY_EVALUATION:
+        printf("Lazy evaluation not supported at line %u\n", pos->get_start_line());
+        break;
+    case WC_CONDITION_NOT_UNIFORM:
+        printf("Ternary operator condition is not uniform at line %u\n", pos->get_start_line());
+        break;
+    case WC_SIDE_EFFECT_CALL:
+        printf("Call has side effect at line %u\n", pos->get_start_line());
+        break;
+    case WC_FORBIDDEN_CALL_TO_LOCAL:
+        printf("Inlining call to local function is forbidden at line %u\n", pos->get_start_line());
+        break;
+    case WC_CONDITION_NOT_CONSTANT:
+        printf("Condition is not constant at line %u\n", pos->get_start_line());
+        break;
+    default:
+        break;
+    }
+#endif
+}
+
 // Check if we support inlining of the given expression.
 bool Inline_checker::can_inline(IExpression const *expr)
 {
@@ -591,7 +703,11 @@ bool Inline_checker::can_inline(IExpression const *expr)
                 {
                     // currently, we support assign to locals only
                     IExpression const *arg = u_expr->get_argument();
-                    return is_allowed_assign_target(arg);
+                    bool res = is_allowed_assign_target(arg);
+                    if (!res && m_warn_if_fails) {
+                        warning(WC_COMPLEX_ASSIGNMENT, &u_expr->access_position());
+                    }
+                    return res;
                 }
             default:
                 return true;
@@ -605,7 +721,10 @@ bool Inline_checker::can_inline(IExpression const *expr)
             switch (b_expr->get_operator()) {
             case IExpression_binary::OK_LOGICAL_AND:
             case IExpression_binary::OK_LOGICAL_OR:
-                return false;
+                    if (m_warn_if_fails) {
+                        warning(WC_LAZY_EVALUATION, &b_expr->access_position());
+                    }
+                    return false;
             case IExpression_binary::OK_ASSIGN:
             case IExpression_binary::OK_MULTIPLY_ASSIGN:
             case IExpression_binary::OK_DIVIDE_ASSIGN:
@@ -621,7 +740,11 @@ bool Inline_checker::can_inline(IExpression const *expr)
                 {
                     // currently, we support assign to locals only
                     IExpression const *left = b_expr->get_left_argument();
-                    return is_allowed_assign_target(left);
+                    bool res = is_allowed_assign_target(left);
+                    if (!res && m_warn_if_fails) {
+                        warning(WC_COMPLEX_ASSIGNMENT, &b_expr->access_position());
+                    }
+                    return res;
                 }
             default:
                 return true;
@@ -633,12 +756,30 @@ bool Inline_checker::can_inline(IExpression const *expr)
 
             // Inlining ?: isn't always good, because it has lazy evaluation
             IExpression const *cond = ternary->get_condition();
-            if (!is_uniform(cond) || !can_inline(cond))
+            if (!is_uniform(cond)) {
+                // check if it is constant
+                IValue const *cond_result = cond->fold(
+                    m_module, m_value_factory, &m_var_lookup_handler);
+                if (is<IValue_bad>(cond_result)) {
+                    if (m_warn_if_fails) {
+                        warning(WC_CONDITION_NOT_UNIFORM, &cond->access_position());
+                    }
+                    return false;
+                }
+                if (cond_result->is_zero()) {
+                    return can_inline(ternary->get_false());
+                }
+                return can_inline(ternary->get_true());
+            }
+
+            if (!can_inline(cond)) {
                 return false;
+            }
 
             if (!can_inline(ternary->get_true())) {
                 return false;
             }
+
             if (!can_inline(ternary->get_false())) {
                 return false;
             }
@@ -647,7 +788,19 @@ bool Inline_checker::can_inline(IExpression const *expr)
     case IExpression::EK_CALL:
         {
             IExpression_call const *call = cast<IExpression_call>(expr);
-            return !has_side_effect(call) && allow_call(call);
+            if (has_side_effect(call)) {
+                if (m_warn_if_fails) {
+                    warning(WC_SIDE_EFFECT_CALL, &call->access_position());
+                }
+                return false;
+            }
+            if (!allow_call(call)) {
+                if (m_warn_if_fails) {
+                    warning(WC_FORBIDDEN_CALL_TO_LOCAL, &call->access_position());
+                }
+                return false;
+            }
+            return true;
         }
     default:
         return true;
@@ -876,6 +1029,10 @@ bool Inline_checker::can_inline(IStatement const *stmt)
             IValue const *cond_result = if_stmt->get_condition()->fold(
                 m_module, m_value_factory, &m_var_lookup_handler);
             if (is<IValue_bad>(cond_result)) {
+                if (m_warn_if_fails) {
+                    warning(
+                        WC_CONDITION_NOT_CONSTANT, &if_stmt->get_condition()->access_position());
+                }
                 return false;
             }
 
@@ -883,6 +1040,10 @@ bool Inline_checker::can_inline(IStatement const *stmt)
             if (cond_result->is_one()) {
                 return can_inline(if_stmt->get_then_statement());
             } else if (!cond_result->is_zero()) {
+                if (m_warn_if_fails) {
+                    warning(
+                        WC_CONDITION_NOT_CONSTANT, &if_stmt->get_condition()->access_position());
+                }
                 return false;
             }
 
@@ -900,6 +1061,10 @@ bool Inline_checker::can_inline(IStatement const *stmt)
                 m_module, m_value_factory, &m_var_lookup_handler);
             IValue_int_valued const *cond_val = as<IValue_int_valued>(cond_result);
             if (cond_val == NULL) {
+                if (m_warn_if_fails) {
+                    warning(
+                        WC_CONDITION_NOT_CONSTANT, &switch_stmt->get_condition()->access_position());
+                }
                 return false;
             }
 
@@ -963,6 +1128,10 @@ bool Inline_checker::can_inline(IStatement const *stmt)
 
             // don't allow nested loops
             if (m_var_lookup_handler.get_iteration_variable() != NULL) {
+                if (m_warn_if_fails) {
+                    IStatement_for const *for_stmt = cast<IStatement_for>(stmt);
+                    warning(WC_NESTED_LOOPS_NOT_ALLOWED, &for_stmt->access_position());
+                }
                 return false;
             }
 
@@ -970,6 +1139,9 @@ bool Inline_checker::can_inline(IStatement const *stmt)
             IStatement const             *init_stmt = for_stmt->get_init();
             IStatement_declaration const *decl_stmt = as<IStatement_declaration>(init_stmt);
             if (decl_stmt == NULL) {
+                if (m_warn_if_fails) {
+                    warning(WC_FOR_INIT_NOT_A_VAR_DECL, &init_stmt->access_position());
+                }
                 return false;
             }
 
@@ -977,11 +1149,19 @@ bool Inline_checker::can_inline(IStatement const *stmt)
             IDeclaration_variable const *decl =
                 cast<IDeclaration_variable>(decl_stmt->get_declaration());
             if (decl == NULL || decl->get_variable_count() != 1) {
+                if (m_warn_if_fails) {
+                    warning(WC_SEVERAL_ITERATION_VARIABLES, &decl->access_position());
+                }
                 return false;
             }
             IValue const *init_val = decl->get_variable_init(0)->fold(
                 m_module, m_value_factory, &m_var_lookup_handler);
             if (is<IValue_bad>(init_val)) {
+                if (m_warn_if_fails) {
+                    warning(
+                        WC_ITERATION_START_NOT_CONSTANT,
+                        &decl->get_variable_init(0)->access_position());
+                }
                 return false;
             }
 
@@ -1014,12 +1194,22 @@ bool Inline_checker::can_inline(IStatement const *stmt)
                 }
 
                 if (!m_var_lookup_handler.update_iteration_variable(for_stmt->get_update())) {
+                    if (m_warn_if_fails) {
+                        warning(
+                            WC_ITERATION_UPDATE_NOT_CONSTANT,
+                            &for_stmt->get_update()->access_position());
+                    }
                     res = false;
                     break;
                 }
             }
             // didn't exit loop in time?
             if (steps > max_steps) {
+                if (res && m_warn_if_fails) {
+                    warning(
+                        WC_LOOP_EXCEED_MAX_STEPS,
+                        &for_stmt->access_position());
+                }
                 res = false;
             }
 
@@ -1037,8 +1227,25 @@ bool Inline_checker::can_inline(IStatement const *stmt)
         }
     default:
         // others not yet supported
+        if (m_warn_if_fails) {
+            warning(WC_STMT_NOT_SUPPORTED, &stmt->access_position());
+        }
         return false;
     }
+}
+
+// Check if we support inlining the current function at the given call-site.
+bool Inline_checker::can_inline(Position const *pos)
+{
+    m_call_pos = pos;
+    return can_inline();
+}
+
+// Check if we support inlining the current function at the given call-site.
+bool Inline_checker::can_inline(DAG_DbgInfo dbg_info)
+{
+    m_call_dbg = dbg_info;
+    return can_inline();
 }
 
 // Check if we support inlining the current function at the given call-site.
@@ -1713,12 +1920,12 @@ DAG_node const *DAG_builder::stmt_to_dag(
 
                 // case inlining results in any skipping?
                 if (m_skip_flags != INL_NO_SKIP) {
-                    // consume any breaks
+                    // we stopped at a break which finishes that case: consume it and end the case
                     m_skip_flags = Inline_skip_flag(m_skip_flags & ~INL_SKIP_BREAK);
                     return res;
                 }
 
-                // no skipping, so it's a fall-through, move to next case
+                // the case ends without a break, so it's a fall-through, move to next case
                 ++cur_case_idx;
             }
 
@@ -1746,17 +1953,22 @@ DAG_node const *DAG_builder::stmt_to_dag(
                 IValue const *cond_result = cond->fold(
                     module, m_node_factory.get_value_factory(),  &var_lookup_handler);
                 if (cond_result->is_zero()) {
+                    // stop the loop if the condition is false
                     break;
                 } else if (!cond_result->is_one()) {
+                    // in MDL we have bool typed conditions, so it should fold to 0 or 1
                     MDL_ASSERT(!"condition could not be folded during for-loop unrolling");
                     break;
                 }
 
+                // inline the body
                 stmt_to_dag(for_stmt->get_body());
                 if (m_skip_flags != INL_NO_SKIP) {
+                    // found a break inside the body, stop here
                     break;
                 }
 
+                // inline the update expression
                 expr_to_dag(for_stmt->get_update());
             }
 
@@ -1768,6 +1980,7 @@ DAG_node const *DAG_builder::stmt_to_dag(
         }
     case IStatement::SK_BREAK:
         {
+            // we found a break, stop inline and remember this condition
             m_skip_flags = Inline_skip_flag(m_skip_flags | INL_SKIP_BREAK);
             return NULL;
         }
@@ -2274,21 +2487,9 @@ string DAG_builder::get_binary_name(
                     return name;
                 }
             case IType::TK_VECTOR:
-                {
-                    IType_vector const *v_type = cast<IType_vector>(left_type);
-                    string             v_name(type_to_name(v_type));
-
-                    // create the name (+ signature) of the index function here
-                    string name = v_name;
-                    name += "@";
-                    if (with_signature_suffix) {
-                        name += "(";
-                        name += v_name;
-                        name += ",int)";
-                    }
-
-                    return name;
-                }
+                // select operations are always transformed into index operations wit a constant
+                // index, so return the "one for all" index function
+                return string("operator[](<0>[],int)", get_allocator());
             default:
                 break;
             }
@@ -3102,9 +3303,10 @@ DAG_node const *DAG_builder::try_inline(
             m_node_factory.get_call_evaluator(),
             f_decl,
             call,
+            m_tmp_value_map,
             m_forbid_local_calls,
-            m_tmp_value_map);
-        if (!checker.can_inline()) {
+            /*warn_if_fails=*/false);
+        if (!checker.can_inline(&call->access_position())) {
             return NULL;
         }
     }
@@ -3112,9 +3314,15 @@ DAG_node const *DAG_builder::try_inline(
     MDL_module_scope mod_scope(*this, owner_mod.get());
 
     DAG_node const *res = stmt_to_dag(f_decl->get_body());
+
+    // if there is break pending, we did not process it right
     MDL_ASSERT((m_skip_flags & INL_SKIP_BREAK) == 0 && "break was not properly handled");
+
+    // we should either have a result, or stopped at a return statement
     MDL_ASSERT(res != NULL || (m_skip_flags & INL_SKIP_RETURN) != 0);
+
     if ((m_skip_flags & INL_SKIP_RETURN) != 0) {
+        // we stopped at a return statement, return the return expression
         res = m_inline_return_node;
         m_skip_flags = INL_NO_SKIP;
     }
@@ -3123,6 +3331,7 @@ DAG_node const *DAG_builder::try_inline(
 
 // Try to inline the given call.
 DAG_node const *DAG_builder::try_inline(
+    DAG_call const                *call,
     IGenerated_code_dag const     *owner_dag,
     IDefinition const             *def,
     DAG_call::Call_argument const *args,
@@ -3199,9 +3408,10 @@ DAG_node const *DAG_builder::try_inline(
             m_node_factory.get_call_evaluator(),
             func_decl,
             arg_types,
+            m_tmp_value_map,
             m_forbid_local_calls,
-            m_tmp_value_map);
-        if (!checker.can_inline()) {
+            /*warn_if_fails=*/false);
+        if (!checker.can_inline(call->get_dbg_info())) {
             return NULL;
         }
     }
@@ -3209,9 +3419,14 @@ DAG_node const *DAG_builder::try_inline(
     MDL_module_scope mod_scope(*this, owner_mod.get());
 
     DAG_node const *res = stmt_to_dag(func_decl->get_body());
+
+    // if there is break pending, we did not process it right
     MDL_ASSERT((m_skip_flags & INL_SKIP_BREAK) == 0 && "break was not properly handled");
+
+    // we should either have a result, or stopped at a return statement
     MDL_ASSERT(res != NULL || (m_skip_flags & INL_SKIP_RETURN) != 0);
     if ( (m_skip_flags & INL_SKIP_RETURN) != 0 ) {
+        // we stopped at a return statement, return the return expression
         res = m_inline_return_node;
         m_skip_flags = INL_NO_SKIP;
     }

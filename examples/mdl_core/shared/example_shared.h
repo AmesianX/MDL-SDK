@@ -164,33 +164,55 @@ inline std::string dirname(const std::string& path)
 }
 
 /// Returns the complete text content of the file with the given filename as a string.
-inline std::string read_text_file(const std::string& filename)
-{
-    std::ifstream file(filename.c_str());
-    if (!file.is_open())
-    {
-        fprintf(stderr, "Cannot open file : \"%s\".\n", filename.c_str());
-        return "";
-    }
+std::string read_text_file(const std::string& filename);
 
-    std::stringstream string_stream;
-    string_stream << file.rdbuf();
-    return string_stream.str();
-}
+/// Finds the location of a shader file.
+///
+/// Considers the directory of the executable first, then the one indicated by
+/// \p relative_directory.
+///
+/// Despite its name the function can also be used for other types of files that are located
+/// next to the example, e.g., resource files.
+///
+/// \param relative_directory   The location relative to the root directory of the examples.
+/// \param shader_filename      The name of the shader file.
+/// \return                     The found location, or the empty string in case of failure.
+std::string find_shader_file(
+    const char* relative_directory, const char* shader_filename);
 
-/// Returns a string pointing to the directory relative to which the MDL Core examples
-/// expect their resources, e. g. materials or textures.
-std::string get_samples_root();
+/// Reads the contents of a shader file.
+///
+/// Considers the directory of the executable first, then the one indicated by
+/// \p relative_directory.
+///
+/// \param relative_directory   The location relative to the root directory of the examples.
+/// \param shader_filename      The name of the shader file.
+/// \return                     The found location, or the empty string in case of failure.
+std::string read_shader_file(const char* relative_directory, const char* shader_filename);
+
+/// Returns the root directory of the examples.
+///
+/// The root directory of the examples is the one that contains the "mdl/nvidia/sdk_examples"
+/// directory. The following steps are performed to find it:
+/// - If the environment variable MDL_EXAMPLES_ROOT is set, it is returned (without checking for
+///   the existence of the subdirectory mentioned above).
+/// - Starting from the directory of the executable all parent directories are considered in
+///   turn bottom-up, checked for the existence of the "mdl/nvidia/sdk_examples" and
+///   "share/mdl-sdk/examples/mdl/nvidia/sdk_examples" (for tools in vcpkg) subdirectories, and the
+///   first successful directory is returned.
+/// - If that subdirectory of the source tree exists, it is returned.
+/// - Finally, the current working directory is returned (as ".").
+std::string get_examples_root();
 
 /// Returns a string pointing to the MDL search root for the MDL Core examples
-inline std::string get_samples_mdl_root()
+inline std::string get_examples_mdl_root()
 {
-    return get_samples_root() + "/mdl";
+    return get_examples_root() + "/mdl";
 }
 
 /// Returns a directory that contains ::nvidia::core_definitions and ::nvida::axf_to_mdl.
 ///
-/// Might also return "." if that directory is the "mdl" subdirectory of #get_samples_root()
+/// Might also return "." if that directory is the "mdl" subdirectory of #get_examples_root()
 /// and no extra handling is required.
 std::string get_src_shaders_mdl();
 
@@ -246,8 +268,15 @@ inline mi::mdl::IMDL* load_mdl_compiler(const char* filename = 0)
 #ifdef MI_PLATFORM_WINDOWS
     void* handle = LoadLibraryA((LPSTR) filename);
     if (!handle) {
-        // fall back to libraries in a relative bin folder, relevant for install targets
+        // Fall back to libraries in a relative "bin" directory, relevant for install targets
+        // (examples).
         std::string fallback = std::string("../../../bin/") + filename;
+        handle = LoadLibraryA(fallback.c_str());
+    }
+    if (!handle) {
+        // Fall back to libraries in a relative "bin" directory, relevant for install targets
+        // (examples as tools in vcpkg).
+        std::string fallback = std::string("../../bin/") + filename;
         handle = LoadLibraryA(fallback.c_str());
     }
     if (!handle) {
@@ -263,7 +292,7 @@ inline mi::mdl::IMDL* load_mdl_compiler(const char* filename = 0)
             LocalFree(buffer);
         return nullptr;
     }
-    void* symbol = GetProcAddress((HMODULE) handle, "mi_mdl_factory");
+    FARPROC symbol = GetProcAddress((HMODULE) handle, "mi_mdl_factory");
     if (!symbol) {
         LPTSTR buffer = 0;
         LPCTSTR message = TEXT("unknown failure");
@@ -1307,4 +1336,4 @@ int wmain(int argc, wchar_t* argv[]) { \
 
 #endif
 
-#endif // MI_EXAMPLE_SHARED_H
+#endif // EXAMPLE_SHARED_H

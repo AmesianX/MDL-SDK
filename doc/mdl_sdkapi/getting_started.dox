@@ -90,7 +90,7 @@ The following third-party dependencies are used by several and/or major
 examples. Installation is strongly recommended unless the corresponding group
 of examples is of no interest to you.
 
--   <a name="vcpkg">**vcpkg**</a> *(git commit ID ef7dbf9)*
+-   <a name="vcpkg">**vcpkg**</a> *(git commit ID 30d7c16)*
     [Vcpkg](https://vcpkg.io/en/getting-started.html) is the recommended way to
     install other dependencies like GLEW and GLFW. The
     vcpkg version mentioned above corresponds to the versions mentioned for
@@ -129,7 +129,7 @@ of examples is of no interest to you.
     Please follow the instructions on the 
     [CUDA Developer Website](https://developer.nvidia.com/cuda-toolkit).
 
--   **Vulkan SDK** *(1.4.304.0)* \n
+-   **Vulkan SDK** *(1.4.309.0)* \n
     Building the Vulkan examples requires the Vulkan headers and validation layers,
     volk, and glslang. \n
     Installation via [vcpkg](#vcpkg) is strongly recommended. Install the vcpkg
@@ -146,12 +146,14 @@ features.
     Pre-compiled binaries can be found on
     [llvm.org](http://releases.llvm.org/download.html#12.0.1).
 
--   **MaterialX** (github repository, tag: v1.39.3, Windows only) \n
+-   **MaterialX** (github repository, tag: v1.39.4) \n
     This dependency adds MaterialX support to the DXR example. \n
-    Please download a release from
-    [github](https://github.com/AcademySoftwareFoundation/MaterialX/releases). \n
-    The pre-built packages do not contain libs for debug. If those are needed,
-    a build from source is required.
+    Note that the pre-build packages for Windows from
+    [github](https://github.com/AcademySoftwareFoundation/MaterialX/releases)
+    are not directly suitable since they are linked with the dynamic MSVC
+    runtime (see also the option
+    [MDL_MSVC_DYNAMIC_RUNTIME](#mdl-msvc-dynamic-runtime)). The pre-built
+    packages also do not contain debug libraries.
 
 -   **NVIDIA CUDA Toolkit** *(8.0)* \n
     This exact version is required by the OptiX 7 example to generate LLVM bitcode
@@ -236,9 +238,7 @@ features.
         for example: *C:/projects/thirdparty/dxc_2022_07_18*
 
     -   **MATERIALX_DIR** in Ungrouped Entries, \n
-        for example: *C:/projects/thirdparty/git/MaterialX* \n
-        See also the option
-        [MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE](#mdl-msvc-dynamic-dxr).
+        for example: *C:/projects/thirdparty/git/MaterialX*
 
     -   **python_PATH** in Ungrouped Entries (only if not found in the PATH), \n
         for example: *C:/projects/thirdparty/python_3_10_0/bin/python.exe*
@@ -410,17 +410,12 @@ In case of any help request, please attach the log messages generated when the l
 
 The following options affect how various components are built:
 
--   **MDL_MSVC_DYNAMIC_RUNTIME** \n
-    [ON/OFF] links all binaries except for the DXR example with the dynamic
-    MSVC runtime (/MD or /MDd) instead of the static one (/MT or /MTd).
+-   <a name="mdl-msvc-dynamic-runtime">**MDL_MSVC_DYNAMIC_RUNTIME** \n
+    [ON/OFF] links binaries on Windows with the dynamic MSVC runtime (/MD or
+    /MDd) instead of the static one (/MT or /MTd). Note that changing this
+    value also requires a different vcpkg triplet and possibly changes to
+    other dependencies. Default: OFF.
     Default: OFF.
-
--   <a name="mdl-msvc-dynamic-dxr">**MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE**</a>\n
-    [ON/OFF] links the DXR example with the dynamic MSVC runtime (/MD or /MDd)
-    instead of the static one (/MT or /MTd). If MaterialX support is enabled
-    (see the option [MDL_ENABLE_MATERIALX](#mdl-enable-materialx)), and the
-    pre-built MaterialX libraries are used, then this option needs to be
-    enabled. Default: ON
 
 The following options enable you to select the examples to be built based on
 their required thirdparty dependencies (see also **MDL_BUILD_SDK_EXAMPLES**
@@ -451,9 +446,7 @@ above):
     [ON/OFF] enable/disable the build of the MDL Arnold Plugin.
 
 -   <a name="mdl-enable-materialx">**MDL_ENABLE_MATERIALX**</a> \n
-    [ON/OFF] enable/disable MaterialX in examples that support it. See also the
-    option [MDL_MSVC_DYNAMIC_RUNTIME_DXR_EXAMPLE](#mdl-msvc-dynamic-dxr).
-
+    [ON/OFF] enable/disable MaterialX in examples that support it.
 
 \endif
 

@@ -40,7 +40,7 @@
 
 #include "example_shared.h"
 #include "utils/io.h"
-#include "utils/strings.h"
+#include "utils/sdk_strings.h"
 
 #include <AxF/decoding/AxF_basic_io.h>
 #include <AxF/decoding/Sampler.h>

@@ -617,6 +617,7 @@ private:
 #define MDL_CTX_OPTION_TARGET_MATERIAL_MODEL_MODE          "target_material_model_mode"
 #define MDL_CTX_OPTION_USER_DATA                           "user_data"
 #define MDL_CTX_OPTION_TARGET_TYPE                         "target_type"
+#define MDL_CTX_OPTION_RERUN_INLINING                      "rerun_inlining"
 // Not documented in the API (used by the module transformer, but not for general use).
 #define MDL_CTX_OPTION_KEEP_ORIGINAL_RESOURCE_FILE_PATHS   "keep_original_resource_file_paths"
 

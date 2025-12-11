@@ -41,8 +41,8 @@
 
 #include <cctype>
 #include <cmath>
-#include <string>
 #include <cstring>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -59,13 +59,6 @@ namespace MI {
 namespace LIGHTPROFILE {
 
 namespace {
-
-// Valid IES versions strings
-const static char* IESNA_1991 = "IESNA91";
-const static char* IESNA_1995 = "IESNA:LM-63-1995";
-const static char* IESNA_2002 = "IESNA:LM-63-2002";
-const static char* IES_2019 = "IES:LM-63-2019";
-const static char* IES_UNKNOWN = "IES:LM-63-";
 
 // Specification used to give additional notes on parser errors
 //
@@ -89,6 +82,13 @@ constexpr static Uint MAX_LINE_LENGTH = 4096;   // though standard is 132/256
 class Lightprofile_ies_parser
 {
 public:
+    // Valid IES versions strings
+    inline static const std::string IESNA_1991 = "IESNA91";
+    inline static const std::string IESNA_1995 = "IESNA:LM-63-1995";
+    inline static const std::string IESNA_2002 = "IESNA:LM-63-2002";
+    inline static const std::string IES_2019 = "IES:LM-63-2019";
+    inline static const std::string IES_UNKNOWN = "IES:LM-63-";
+
     // IES versions according to IES spec (which might be continued ...)
     enum Version {
         IESNA_LM_63_1986 = 0,
@@ -301,27 +301,31 @@ bool Lightprofile_ies_parser::parse_version(
     while(*version && isspace(static_cast<unsigned char>(*version)))
         version++; // remove trailing white space
 
-    if(!strncmp(IESNA_1991, version, strlen(IESNA_1991)))
+    if (version == IESNA_1991)
     {
         m_version = IESNA_LM_63_1991;
         return true;
     }
-    else if(!strncmp(IESNA_1995, version, strlen(IESNA_1995)))
+
+    if (version == IESNA_1995)
     {
         m_version = IESNA_LM_63_1995;
         return true;
     }
-    else if(!strncmp(IESNA_2002, version, strlen(IESNA_2002)))
+
+    if (version == IESNA_2002)
     {
         m_version = IESNA_LM_63_2002;
         return true;
     }
-    else if (!strncmp(IES_2019, version, strlen(IES_2019)))
+
+    if (version == IES_2019)
     {
         m_version = IES_LM_63_2019;
         return true;
     }
-    else if(!strncmp(IES_UNKNOWN, version, strlen(IES_UNKNOWN)))
+
+    if (version == IES_UNKNOWN)
     {
         // if a future version comes up, interpret it is as the highest version
         // known to the parser (instead of falling back to the old standard)
@@ -333,12 +337,10 @@ bool Lightprofile_ies_parser::parse_version(
         m_version = IES_LM_63_2019;
         return true;
     }
-    else
-    {
-        // no header, fall back old standard
-        m_version = IESNA_LM_63_1986;
-        return false;
-    }
+
+    // no header, fall back old standard
+    m_version = IESNA_LM_63_1986;
+    return false;
 }
 
 //

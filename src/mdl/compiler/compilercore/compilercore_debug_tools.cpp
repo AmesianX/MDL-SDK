@@ -1053,8 +1053,8 @@ private:
 
 // Constructor
 Win32_symbol_lookup::Win32_symbol_lookup()
-: m_hProcess(GetCurrentProcess())
-, m_initialized(false)
+: m_initialized(false)
+, m_hProcess(GetCurrentProcess())
 , m_hDbgHelp(NULL)
 , SymInitialize(NULL)
 , SymFromAddr(NULL)

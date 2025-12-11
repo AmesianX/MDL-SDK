@@ -63,7 +63,7 @@ public:
     /// Listing options.
     int m_dependency_options = DEPENDENCY_ALL;
     bool m_recursive = false; // scan modules recursively.
-    
+
     /// MDL search paths
     std::vector<std::string> m_mdl_paths;
 };
@@ -91,7 +91,7 @@ private:
     mi::mdl::IMDL* m_mdl_compiler;
     mi::base::Handle<mi::mdl::IThread_context> m_ctx;
     mi::base::Handle<mi::mdl::IEntity_resolver> m_entity_resolver;
-    
+
     Options m_options;
 
     // List of modules already visited.
@@ -212,8 +212,8 @@ void Dependency_inspector::list_dependencies( const mi::mdl::IModule* module)
                         const char* filename = resource_set->get_filename_mask();
                         if (!was_listed(filename))
                             std::cout << filename << std::endl;
-                    }                  
-                }                
+                    }
+                }
             }
         }
     }
@@ -281,7 +281,7 @@ options:
 bool Options::parse(int argc, char* argv[])
 {
     // Get MDL search root for the MDL Core examples
-    m_mdl_paths.push_back(get_samples_mdl_root());
+    m_mdl_paths.push_back(get_examples_mdl_root());
 
     for (int i = 1; i < argc; ++i)
     {

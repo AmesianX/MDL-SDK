@@ -65,7 +65,7 @@ layout(std140, set = 0, binding = BINDING_RENDER_PARAMS) uniform Render_params
     vec3 uPointLightPos;
     vec3 uPointLightColor;
     float uPointLightIntensity;
-    
+
     // Environment map
     float uEnvironmentIntensityFactor;
     float uEnvironmentInvIntegral;
@@ -183,7 +183,7 @@ vec3 mdl_backface_emission_intensity(in State_core state);
 #define mdl_backface_emission_intensity mdl_emission_intensity
 #endif // HAS_BACKFACE_EMISSION_INTENSITY
 
-vec3 mdl_absorption_coefficient(in State_core state);
+vec3 mdl_volume_absorption_coefficient(in State_core state);
 float mdl_standalone_cutout_opacity(in State_core state);
 
 
@@ -260,7 +260,7 @@ vec3 environment_sample(inout uint seed, out vec3 to_light, out float pdf)
 
     const uint py = env_idx / tex_size.x;
     const uint px = env_idx % tex_size.x;
-    
+
     // uniformly sample spherical area of pixel
     const float u = float(px + xi_y) / float(tex_size.x);
     const float phi = u * 2.0 * M_PI - M_PI;
@@ -272,7 +272,7 @@ vec3 environment_sample(inout uint seed, out vec3 to_light, out float pdf)
     const float theta = acos(cos_theta);
     const float sin_theta = sin(theta);
     to_light = vec3(cos_phi * sin_theta, -cos_theta, sin_phi * sin_theta);
-    
+
     // lookup filtered beauty
     const float v = theta * M_ONE_OVER_PI;
     const vec4 t = textureLod(uEnvironmentMap, vec2(u, v), /*lod=*/0);
@@ -394,7 +394,7 @@ State_core make_mdl_state(Ray_hit_info hit_info, bool inside)
         /*meters_per_scene_unit=*/  1.0,
         /*arg_block_offset=*/       0
     );
-    
+
 }
 
 
@@ -409,20 +409,20 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
             float light_pdf;
             vec3 light_radiance = environment_evaluate(ray_state.dir, light_pdf);
 
-            // Incoperate point light selection probability
+            // Incorporate point light selection probability
             if (uPointLightIntensity > 0.0)
                 light_pdf *= 0.5;
 
             float mis_weight = ray_state.last_bsdf_pdf == DIRAC
                 ? 1.0
                 : ray_state.last_bsdf_pdf / (ray_state.last_bsdf_pdf + light_pdf);
-            
+
             ray_state.contribution += light_radiance * ray_state.weight * mis_weight;
             break;
         }
 
         State_core state = make_mdl_state(hit_info, ray_state.is_inside);
-        
+
         // Handle cutout opacity
         float x_anyhit = rnd(seed);
         if (x_anyhit > mdl_standalone_cutout_opacity(state))
@@ -438,7 +438,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
 
         // Pre-compute and cache data used by generated MDL *_sample, *_evaluate functions
         // NOTE: Would also cache data for cutout_opacity, but in this example we compile the
-        //       cutout_opacity function standalone so no expensive pre-comupation is done if
+        //       cutout_opacity function standalone so no expensive pre-computation is done if
         //       the cutout opacity causes this hit to be ignored.
         mdl_init(state);
 
@@ -450,7 +450,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
         // Apply volume attenuation
         if (ray_state.is_inside && !thin_walled)
         {
-            const vec3 abs_coeff = mdl_absorption_coefficient(state);
+            const vec3 abs_coeff = mdl_volume_absorption_coefficient(state);
             ray_state.weight.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_info.dist) : 1.0;
             ray_state.weight.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_info.dist) : 1.0;
             ray_state.weight.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_info.dist) : 1.0;
@@ -459,7 +459,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
         // Add emission
         Edf_evaluate_data edf_evaluate_data;
         edf_evaluate_data.k1 = -ray_state.dir;
-        
+
         if (is_backface)
         {
             mdl_backface_edf_evaluate(edf_evaluate_data, state);
@@ -528,7 +528,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
                     mdl_backface_bsdf_evaluate(bsdf_eval_data, state);
                 else
                     mdl_bsdf_evaluate(bsdf_eval_data, state);
-                
+
                 if (bsdf_eval_data.pdf > 0.0)
                 {
                     const vec3 bsdf = bsdf_eval_data.bsdf_diffuse + bsdf_eval_data.bsdf_glossy;
@@ -555,7 +555,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
 
         if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
             break;
-        
+
         // Continue path
         bool is_specular = (bsdf_sample_data.event_type & BSDF_EVENT_SPECULAR) != 0;
         bool is_transmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;

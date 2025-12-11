@@ -55,7 +55,7 @@ public:
 
     Transaction_id get_id() const { return m_transaction->get_id(); }
 
-    Scope* get_scope() { return m_transaction->get_scope(); }
+    Scope* get_scope() const { return m_transaction->get_scope(); }
 
     mi::Uint32 get_next_sequence_number() const
     {

@@ -63,6 +63,12 @@ create_from_base_preset(
     )
 set_source_files_properties(${PROJECT_ADDITIONAL_FILES} PROPERTIES HEADER_FILE_ONLY TRUE)
 
+# add include directory for utils/mdl.h explicitly to avoid the dependency in standalone scenarios
+target_include_directories(
+    ${PROJECT_NAME}
+    PRIVATE ${MDL_EXAMPLES_FOLDER}/mdl_sdk/shared
+    )
+
 # customize name
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "mdl_arnold")
@@ -78,7 +84,6 @@ add_library(mdl::mdl_arnold ALIAS ${PROJECT_NAME})
 target_add_dependencies(TARGET ${PROJECT_NAME}
     DEPENDS
         mdl::mdl_sdk
-        mdl_sdk::shared
     )
 
 # add Arnold SDK but without binary dependencies

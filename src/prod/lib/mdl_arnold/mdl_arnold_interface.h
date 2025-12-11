@@ -95,7 +95,6 @@ private:
         const char* value);
 
 private:
-    void* m_so_handle;
     EMdl_sdk_state m_state;
     AtString m_default_mdl_module_name;
     AtString m_default_mdl_function_name;

@@ -39,8 +39,8 @@ PYTHONPATH=@BINDING_MODULE_PATH@/@_CONFIG@${PYTHONPATH:+:${PYTHONPATH}}
 export PYTHONPATH
 
 # Path of the examples to access the example content
-MDL_SAMPLES_ROOT=@CMAKE_CURRENT_SOURCE_DIR@/../
-export MDL_SAMPLES_ROOT
+MDL_EXAMPLES_ROOT=@CMAKE_CURRENT_SOURCE_DIR@/../
+export MDL_EXAMPLES_ROOT
 
 # Path of the examples to access the common modules
 MDL_SRC_SHADERS_MDL=@MDL_SRC_FOLDER@/shaders/mdl/

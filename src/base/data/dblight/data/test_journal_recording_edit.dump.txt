@@ -1,11 +1,10 @@
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 0
     Journal last pruned visibility: 4294967295
     Journal size: 0
 
 Count of all transactions: 1
-Count of open transactions: 1
-ID 0: pin count = 5, state = OPEN, next sequence number = 3, visibility ID = 4294967295
+ID 0: scope ID = 0, pin count = 5, state = OPEN, next sequence number = 3, visibility ID = 4294967295
     Journal size: 3
     Item 0: tag = 1, version = 0, scope ID = 0, journal type = 1
     Item 1: tag = 2, version = 1, scope ID = 0, journal type = 1
@@ -30,7 +29,7 @@ Count of infos by class IDs:
      3 0x4d79656c "Myel"
 
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 1
     Journal last pruned visibility: 4294967295
     Journal size: 3
     Item 0: visibility ID = 1, tag = 1, version = 0, transaction ID = 0, journal type = 1
@@ -38,8 +37,7 @@ ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
     Item 2: visibility ID = 1, tag = 1, version = 2, transaction ID = 0, journal type = 2
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 0: pin count = 1, state = COMMITTED, next sequence number = 3, visibility ID = 1
+ID 0: scope ID = 0, pin count = 1, state = COMMITTED, next sequence number = 3, visibility ID = 1
     Journal size: 0
 
 Count of infos by distinct names: 2
@@ -59,7 +57,7 @@ Count of infos by class IDs:
      2 0x4d79656c "Myel"
 
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 1
     Journal last pruned visibility: 4294967295
     Journal size: 3
     Item 0: visibility ID = 1, tag = 1, version = 0, transaction ID = 0, journal type = 1
@@ -67,8 +65,7 @@ ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
     Item 2: visibility ID = 1, tag = 1, version = 2, transaction ID = 0, journal type = 2
 
 Count of all transactions: 1
-Count of open transactions: 1
-ID 1: pin count = 3, state = OPEN, next sequence number = 1, visibility ID = 4294967295
+ID 1: scope ID = 0, pin count = 3, state = OPEN, next sequence number = 1, visibility ID = 4294967295
     Journal size: 1
     Item 0: tag = 2, version = 0, scope ID = 0, journal type = 2
 
@@ -91,7 +88,7 @@ Count of infos by class IDs:
      3 0x4d79656c "Myel"
 
 Count of all scopes: 1
-ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
+ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0, lowest open transaction ID = 2
     Journal last pruned visibility: 4294967295
     Journal size: 4
     Item 0: visibility ID = 1, tag = 1, version = 0, transaction ID = 0, journal type = 1
@@ -100,8 +97,7 @@ ID 0: name = (null), pin count = 2, level = 0, parent ID = (null), removed = 0
     Item 3: visibility ID = 2, tag = 2, version = 0, transaction ID = 1, journal type = 2
 
 Count of all transactions: 1
-Count of open transactions: 0
-ID 1: pin count = 1, state = COMMITTED, next sequence number = 1, visibility ID = 2
+ID 1: scope ID = 0, pin count = 1, state = COMMITTED, next sequence number = 1, visibility ID = 2
     Journal size: 0
 
 Count of infos by distinct names: 2

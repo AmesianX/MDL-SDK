@@ -28,22 +28,7 @@
 
 #include "mdl_python.h"
 
-#include "utils/mdl.h"
-
-// Avoid pulling in mdl.cpp which has more dependencies.
-namespace mi { namespace examples { namespace mdl {
-
-#ifdef MI_PLATFORM_WINDOWS
-// Pointer to the DSO handle. Cached here for unload().
-HMODULE g_dso_handle;
-#else
-// Pointer to the DSO handle. Cached here for unload().
-void* g_dso_handle;
-#endif
-
-mi::base::Handle<mi::base::ILogger> g_logger;
-
-} } } // mi::examples::mdl
+#include <utils/loading.cpp>
 
 mi::neuraylib::INeuray* g_neuray;
 

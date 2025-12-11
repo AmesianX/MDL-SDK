@@ -126,7 +126,7 @@ private:
 };
 
 /// Implementation of a module.
-class Module : public Allocator_interface_implement<IModule>
+class Module MDL_FINAL : public Allocator_interface_implement<IModule>
 {
     typedef Allocator_interface_implement<IModule> Base;
     friend class Allocator_builder;

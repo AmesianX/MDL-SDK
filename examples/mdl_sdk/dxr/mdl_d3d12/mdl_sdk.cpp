@@ -105,12 +105,6 @@ Mdl_sdk::Mdl_sdk(Base_application* app)
         log_error("Failed to load the 'mdl_distiller' plugin. Continue without distilling support.");
     }
 
-    // optional lod distiller
-    // serves as example for a custom distiller plugin
-    if (mi::examples::mdl::load_plugin(m_neuray.get(), "mdl_lod_distiller" MI_BASE_DLL_FILE_EXT) == 0)
-    {
-        log_info("Loaded 'mdl_lod_distiller' plugin.");
-    }
 
     // Start the MDL SDK
     mi::Sint32 result = m_neuray->start();
@@ -194,27 +188,30 @@ void Mdl_sdk::reconfigure_search_paths()
     m_config->clear_mdl_paths();
 
     // add admin space search paths before user space paths
-    m_config->add_mdl_system_paths();
-    m_config->add_mdl_user_paths();
+    if (!m_app->get_options()->no_mdl_std_path)
+    {
+        m_config->add_mdl_system_paths();
+        m_config->add_mdl_user_paths();
 
-    // also add example search paths.
-    // additionally, add the executable folder (if it contains an mdl folder).
-    std::string example_search_path1 = mi::examples::mdl::get_examples_root() + "/mdl";
-    if (!mi::examples::io::directory_exists(example_search_path1) ||
-        m_config->add_mdl_path(example_search_path1.c_str()) != 0)
-        log_warning("Failed to add the MDL example search path: " + example_search_path1, SRC);
-    std::string example_search_path2 = mi::examples::mdl::get_src_shaders_mdl();
-    if (example_search_path2 != ".") {
-        if (!mi::examples::io::directory_exists(example_search_path2) ||
-            m_config->add_mdl_path(example_search_path2.c_str()) != 0)
-            log_warning("Failed to add the MDL example search path: " + example_search_path2, SRC);
+        // also add example search paths.
+        // additionally, add the executable folder (if it contains an mdl folder).
+        std::string example_search_path1 = mi::examples::mdl::get_examples_root() + "/mdl";
+        if (!mi::examples::io::directory_exists(example_search_path1) ||
+            m_config->add_mdl_path(example_search_path1.c_str()) != 0)
+            log_warning("Failed to add the MDL example search path: " + example_search_path1, SRC);
+        std::string example_search_path2 = mi::examples::mdl::get_src_shaders_mdl();
+        if (example_search_path2 != ".") {
+            if (!mi::examples::io::directory_exists(example_search_path2) ||
+                m_config->add_mdl_path(example_search_path2.c_str()) != 0)
+                log_warning("Failed to add the MDL example search path: " + example_search_path2, SRC);
+        }
+
+        std::string app_level_mdl_folder = mi::examples::io::get_executable_folder() + "/mdl";
+        if (mi::examples::io::directory_exists(app_level_mdl_folder) &&
+            m_config->add_mdl_path(app_level_mdl_folder.c_str()) != 0)
+            log_warning("Failed to add the Executable directory as search path: " +
+                app_level_mdl_folder, SRC);
     }
-
-    std::string app_level_mdl_folder = mi::examples::io::get_executable_folder() + "/mdl";
-    if (mi::examples::io::directory_exists(app_level_mdl_folder) &&
-        m_config->add_mdl_path(app_level_mdl_folder.c_str()) != 0)
-        log_warning("Failed to add the Executable directory as search path: " +
-            app_level_mdl_folder, SRC);
 
     // add search paths as defined by the user
     for (auto path : m_app->get_options()->mdl_paths)
@@ -228,12 +225,16 @@ void Mdl_sdk::reconfigure_search_paths()
 
     // list the active set of search paths
     std::string search_paths = "Search paths used in the following order:";
-    for (mi::Size i = 0, n = m_config->get_mdl_paths_length(); i < n; i++)
+    mi::Size n = m_config->get_mdl_paths_length();
+    if (n == 0)
+        search_paths += "\n                      - <none>";
+    for (mi::Size i = 0; i < n; i++)
     {
         mi::base::Handle<const mi::IString> path(m_config->get_mdl_path(i));
         search_paths += "\n                      - ";
         search_paths += path->get_c_str();
     }
+
     log_info(search_paths);
 }
 

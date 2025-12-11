@@ -68,24 +68,6 @@ static std::string to_string(T val)
     return stream.str();
 }
 
-// Reads the content of the given file.
-static std::string read_text_file(const std::string& filename)
-{
-    std::ifstream file(filename.c_str());
-
-    if(!file.is_open())
-    {
-        fprintf( stderr, "Cannot open file: \"%s\".\n", filename.c_str());
-        check_success(file.is_open());
-    }
-
-    std::stringstream string_stream;
-    string_stream << file.rdbuf();
-
-    return string_stream.str();
-}
-
-
 // Dump information of shader compilation to the console.
 static void dump_shader_info(GLuint shader, const char* text)
 {

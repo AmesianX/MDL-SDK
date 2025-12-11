@@ -44,9 +44,8 @@ namespace mi { namespace examples { namespace dxr
     public:
         explicit Example_dxr_options()
             : Base_options()
-            , initial_scene(
-                mi::examples::io::get_executable_folder() +
-                "/content/gltf/sphere/sphere.gltf")
+            , initial_scene(mi::examples::mdl::find_shader_file(
+                MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/gltf/sphere/sphere.gltf"))
             , point_light_enabled(false)
             , point_light_position{ 10.0f, 0.0f, 5.0f }
             , point_light_intensity{ 1.0f, 0.95f, 0.9f }
@@ -59,9 +58,8 @@ namespace mi { namespace examples { namespace dxr
             , exposure_compensation(0.0f)
             , material_overrides()
         {
-            hdr_environment =
-                mi::examples::io::get_executable_folder() +
-                "/content/hdri/hdrihaven_teufelsberg_inner_2k.exr";
+            hdr_environment = mi::examples::mdl::find_shader_file(
+                MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/hdri/hdrihaven_teufelsberg_inner_2k.exr");
         }
 
         std::string initial_scene;
@@ -88,7 +86,7 @@ namespace mi { namespace examples { namespace dxr
         std::stringstream ss;
 
         ss << "\n"
-        << "usage: " << BINARY_NAME << " [options] [<path_to_gltf_scene>]\n"
+        << "Usage: " << BINARY_NAME << " [options] [<path_to_gltf_scene>]\n"
 
         << "-h|--help                 Print this text and exit\n"
 
@@ -99,7 +97,7 @@ namespace mi { namespace examples { namespace dxr
 
         << "--no-color                Disable colored console output for warnings and errors\n"
 
-        << "-g|--generated <path>     File path to write generated MDL (e.g. from MaterialX) to.\n"
+        << "--dump_mdl <path>         File path to write generated MDL (e.g. from MaterialX) to.\n"
         << "                          If the specified path is a folder, the filename will be \n"
         << "                          generated with names defined by the loader.\n"
         << "                          If empty, no files are written (default: <empty>).\n"
@@ -112,7 +110,7 @@ namespace mi { namespace examples { namespace dxr
 
         << "--gpu_debug               Enable the D3D Debug Layer and DRED\n"
 
-        << "--nogui                   Don't open interactive display\n"
+        << "--no_window               Don't open interactive display\n"
 
         << "--hide_gui                GUI can be toggled by pressing SPACE.\n(default: "
                                       << (defaults.hide_gui ? "hidden" : "visible") << ")\n"
@@ -143,6 +141,10 @@ namespace mi { namespace examples { namespace dxr
         << "-p|--mdl_path <path>      MDL search path, can occur multiple times.\n"
 
         << "--mdl_next                Enable features from upcoming MDL version.\n"
+
+        << "--no_mdl_std_path         Prevent adding the MDL system and user and standard application\n"
+           "                          search path(s) to the MDL search path. Only the scene path\n"
+           "                          and paths explicitly stated using '-p|--mdl_path' are added.\n"
 
         << "--max_path_length <num>   Maximum path length (up to one total internal reflection),\n"
         << "                          minimum of 2, default " << defaults.ray_depth << "\n"
@@ -186,7 +188,7 @@ namespace mi { namespace examples { namespace dxr
         << "--uv_offset <x> <y>       Offset the scaled texture coordinates. (default: (0, 0)).\n"
 
         << "--uv_saturate             Clamps the texture coordinates to (0, 1). (default: false).\n"
-        
+
         << "--uv_repeat               Wraps the texture coordinates to (0, 1). (default: false).\n"
 
         << "--mpsu <value>            meters per scene unit. Defines the scale of the scene.\n"
@@ -195,7 +197,7 @@ namespace mi { namespace examples { namespace dxr
         << "--lpe <value>             LPE expression used on startup. Currently only 'beauty',\n"
            "                          'albedo_diffuse', 'albedo_glossy', and 'normal', 'roughness',\n"
            "                          and 'aov' are valid options.\n"
-           "                          Also combinations seperated by ',' are valid with '--nogui'.\n"
+           "                          Also combinations seperated by ',' are valid with '--no_window'.\n"
            "                          (default: " << defaults.lpe[0]<< ")\n"
 
         << "--no_console_window       There will be no console window in addition to the main\n"
@@ -225,7 +227,7 @@ namespace mi { namespace examples { namespace dxr
            "                          If a type is specified and no --aov option is set,\n"
            "                          it's fields will be made available as AOVs.\n"
 
-        << "--avo <field>             Field name of the material type to render. Return types that are\n"
+        << "--aov <field>             Field name of the material type to render. Return types that are\n"
            "                          not supported for visualization will be filtered out. Combinations,\n"
            "                          separated by ',' are valid, too. The first is used for rendering while\n"
            "                          the following will be available on the UI. (default: <empty>)\n"
@@ -241,15 +243,18 @@ namespace mi { namespace examples { namespace dxr
            "                          locating standard data libraries, XInclude references, and\n"
            "                          referenced images. Can occur multiple times.\n"
 
+        << "--no_mtlx_std_path        Prevent adding the standard MaterialX search path location,\n"
+           "                          which references the libraries in the examples binary folder.\n"
+
         << "--mtlx_library <rel_path> Specify an additional relative path to a custom data\n"
            "                          library folder (e.g. 'libraries/custom'). MaterialX files\n"
            "                          at the root of this folder will be included in all content\n"
            "                          documents. Can occur multiple times.\n"
 
         << "--mtlx_to_mdl <version>   Specify the MDL version to generate (requires MaterialX 1.38.9).\n"
-            "                         Supported values are \"1.6\", \"1.7\", ..., \"1.10\", and \"latest\".\n"
-            "                         Later MDL language versions require later MaterialX SDKs, too.\n"
-            "                         (default: \"latest\")\n"
+           "                          Supported values are \"1.6\", \"1.7\", ..., \"1.10\", and \"latest\".\n"
+           "                          Later MDL language versions require later MaterialX SDKs, too.\n"
+           "                          (default: \"latest\")\n"
 
         << "--materialxtest_mode      Setup image and tex-coord space to match the MaterialXTest setup.\n"
         #endif
@@ -287,7 +292,7 @@ namespace mi { namespace examples { namespace dxr
                 {
                     options.enable_auxiliary = false;
                 }
-                else if (wcscmp(opt, L"--nogui") == 0)
+                else if (wcscmp(opt, L"--no_window") == 0)
                 {
                     options.no_gui = true;
 
@@ -337,14 +342,14 @@ namespace mi { namespace examples { namespace dxr
                         return false;
                     }
                 }
-                else if ((wcscmp(opt, L"-g") == 0 || wcscmp(opt, L"--generated") == 0) && i < argc - 1)
+                else if (wcscmp(opt, L"--dump_mdl") == 0 && i < argc - 1)
                 {
-                    options.generated_mdl_path =
+                    options.dump_mdl_path =
                         mi::examples::io::normalize(mi::examples::strings::wstr_to_str(argv[++i]));
 
-                    if (!mi::examples::strings::remove_quotes(options.generated_mdl_path))
+                    if (!mi::examples::strings::remove_quotes(options.dump_mdl_path))
                     {
-                        log_error("Unexpected quotes in: '" + options.generated_mdl_path + "'.");
+                        log_error("Unexpected quotes in: '" + options.dump_mdl_path + "'.");
                         return_code = EXIT_FAILURE;
                         return false;
                     }
@@ -371,7 +376,7 @@ namespace mi { namespace examples { namespace dxr
                     for (std::string& expr : expressions)
                     {
                         // remove white spaces
-                        expr.erase(std::remove_if(expr.begin(), expr.end(), [](unsigned char x) 
+                        expr.erase(std::remove_if(expr.begin(), expr.end(), [](unsigned char x)
                             { return std::isspace(x); }), expr.end());
 
                         if (expr != "beauty" &&
@@ -437,8 +442,8 @@ namespace mi { namespace examples { namespace dxr
                 }
                 else if (wcscmp(opt, L"--fov") == 0 && i < argc - 1)
                 {
-                    options.camera_fov = 
-                        std::max(0.0f, 
+                    options.camera_fov =
+                        std::max(0.0f,
                             std::min(static_cast<float>(_wtof(argv[++i])), 90.0f)) * float(M_PI) / 180.0f;
                 }
                 else if (wcscmp(opt, L"--mat_selective") == 0 && i < argc - 2)
@@ -542,6 +547,10 @@ namespace mi { namespace examples { namespace dxr
                         mdl_path = mi::examples::io::get_working_directory() + "/" + mdl_path;
                     }
                     options.mdl_paths.push_back(mi::examples::io::normalize(mdl_path, true));
+                }
+                else if (wcscmp(opt, L"--no_mdl_std_path") == 0)
+                {
+                    options.no_mdl_std_path = true;
                 }
                 else if (wcscmp(opt, L"--mdl_next") == 0)
                 {
@@ -693,6 +702,10 @@ namespace mi { namespace examples { namespace dxr
                         }
                         options.mtlx_paths.push_back(mi::examples::io::normalize(path));
                     }
+                    else if (wcscmp(opt, L"--no_mtlx_std_path") == 0)
+                    {
+                        options.no_mtlx_std_path = true;
+                    }
                     else if (wcscmp(opt, L"--mtlx_library") == 0 && i < argc - 1)
                     {
                         std::string path = mi::examples::strings::wstr_to_str(argv[++i]);
@@ -753,7 +766,7 @@ namespace mi { namespace examples { namespace dxr
         // options that can be set only if combination
         if (options.lpe.size() > 1 && !options.no_gui)
         {
-            log_error("Multiple LPE expressions can only be set in combination with '--nogui'.");
+            log_error("Multiple LPE expressions can only be set in combination with '--no_window'.");
             return_code = EXIT_FAILURE;
             return false;
         }

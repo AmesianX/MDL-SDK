@@ -75,6 +75,7 @@ namespace mdlm
         {}
         Option(int id)
             : m_id(id)
+            , m_number_of_parameters(-1)
             , m_options(NULL)
             , m_can_appear_mulitple_times(false)
             , m_is_command(false)

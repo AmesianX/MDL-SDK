@@ -48,13 +48,16 @@ Scope_impl::Scope_impl(
     DB::Scope_id id,
     std::string name,
     Scope_impl* parent,
-    DB::Privacy_level level)
+    DB::Privacy_level level,
+    DB::Transaction_id next_transaction_id)
   : m_database( database),
     m_scope_manager( scope_manager),
     m_id( id),
     m_name( std::move( name)),
     m_parent( parent),
-    m_level( level)
+    m_level( level),
+    m_journal_last_pruned_visibility( next_transaction_id-1),
+    m_lowest_open_transaction_id( next_transaction_id)
 {
     if( m_parent)
         m_parent->pin();
@@ -76,8 +79,7 @@ Scope_impl::~Scope_impl()
 
     m_scope_manager->remove_scope_internal( this);
 
-    Transaction_manager* transaction_manager = m_database->get_transaction_manager();
-    info_manager->garbage_collection( transaction_manager->get_lowest_open_transaction_id());
+    info_manager->garbage_collection( /*update_lowest_open_transaction_ids*/ false);
 
     block.release();
     if( m_parent)
@@ -92,7 +94,9 @@ DB::Database* Scope_impl::get_database() const
 DB::Scope* Scope_impl::create_child(
     DB::Privacy_level level, bool /*is_temporary*/, const std::string& name)
 {
-    return m_scope_manager->create_scope( name, this, level);
+    DB::Transaction_id next_transaction_id
+        = m_database->get_transaction_manager()->get_next_transaction_id();
+    return m_scope_manager->create_scope( name, this, level, next_transaction_id);
 }
 
 DB::Transaction* Scope_impl::start_transaction()
@@ -129,6 +133,36 @@ std::unique_ptr<DB::Journal_query_result> Scope_impl::get_journal(
         return nullptr;
 
     return result;
+}
+
+void Scope_impl::add_open_transaction( Transaction_impl* transaction)
+{
+    m_database->get_lock().check_is_owned();
+
+    MI_ASSERT( transaction->get_state() == Transaction_impl::OPEN);
+
+    m_open_transactions.insert( *transaction);
+}
+
+void Scope_impl::remove_open_transaction( Transaction_impl* transaction)
+{
+    m_database->get_lock().check_is_owned();
+
+    MI_ASSERT( transaction->get_state() == Transaction_impl::CLOSING);
+
+    auto it = m_open_transactions.find( *transaction);
+    MI_ASSERT( it != m_open_transactions.end());
+    m_open_transactions.erase( it);
+}
+
+void Scope_impl::update_lowest_open_transaction_id( DB::Transaction_id next_id)
+{
+    m_database->get_lock().check_is_owned_shared_or_exclusive();
+
+    if( m_open_transactions.empty())
+        m_lowest_open_transaction_id = next_id;
+    else
+        m_lowest_open_transaction_id = m_open_transactions.begin()->get_id();
 }
 
 void Scope_impl::insert_info( Info_impl* info)
@@ -254,7 +288,8 @@ Scope_manager::Scope_manager( Database_impl* database)
   : m_database( database)
 {
     // Create global scope.
-    create_scope( /*name*/ {}, /*parent*/ nullptr, /*level*/ 0);
+    DB::Transaction_id next_transaction_id( 0);
+    create_scope( /*name*/ {}, /*parent*/ nullptr, /*level*/ 0, next_transaction_id);
 }
 
 Scope_manager::~Scope_manager()
@@ -299,7 +334,10 @@ DB::Scope* Scope_manager::lookup_scope( const std::string& name)
 }
 
 DB::Scope* Scope_manager::create_scope(
-    const std::string& name, DB::Scope* parent, DB::Privacy_level level)
+    const std::string& name,
+    DB::Scope* parent,
+    DB::Privacy_level level,
+    DB::Transaction_id next_transaction_id)
 {
     THREAD::Block block( &m_database->get_lock());
 
@@ -326,7 +364,8 @@ DB::Scope* Scope_manager::create_scope(
 
     auto* parent_impl = static_cast<Scope_impl*>( parent);
     DB::Scope_id id = m_next_scope_id++;
-    auto* scope = new Scope_impl( m_database, this, id, name, parent_impl, level);
+    auto* scope
+        = new Scope_impl( m_database, this, id, name, parent_impl, level, next_transaction_id);
     m_scopes_by_id.insert( *scope);
     if( !name.empty())
         m_scopes_by_name.insert( *scope);
@@ -375,6 +414,33 @@ void Scope_manager::remove_scope_internal( Scope_impl* scope)
     }
 }
 
+void Scope_manager::update_lowest_open_transaction_ids()
+{
+    // For simplicity, this implementation is linear in the number of scopes, even though only the
+    // scopes on the path from the scope of an ending transaction to the global scope need an
+    // update. However, such an implementation requires more book-keeping and does not pay off as
+    // the number of scopes is typically rather small.
+
+    m_database->get_lock().check_is_owned();
+
+    DB::Transaction_id next_id = m_database->get_transaction_manager()->get_next_transaction_id();
+
+    // Compute lowest open transaction ID per scope, order does not matter.
+    for( auto it = m_scopes_by_id.rbegin(); it != m_scopes_by_id.rend(); ++it)
+        it->update_lowest_open_transaction_id( next_id);
+
+    // Propagate lowest open transaction ID upwards in the scope tree, order does matter.
+    for( auto current = m_scopes_by_id.rbegin(); true; ++current) {
+        Scope_impl* parent = static_cast<Scope_impl*>( current->get_parent());
+        if( !parent)
+            break;
+        DB::Transaction_id current_id = current->get_lowest_open_transaction_id();
+        DB::Transaction_id parent_id  = parent->get_lowest_open_transaction_id();
+        if( current_id < parent_id)
+            parent->set_lowest_open_transaction_id( current_id);
+    }
+}
+
 void Scope_manager::dump( std::ostream& s, bool verbose, bool mask_pointer_values)
 {
     m_database->get_lock().check_is_owned_shared_or_exclusive();
@@ -396,7 +462,9 @@ void Scope_manager::dump( std::ostream& s, bool verbose, bool mask_pointer_value
             s << ", parent ID = " << parent->get_id();
         else
             s << ", parent ID = (null)";
-        s << ", removed = " << scope.get_is_removed() << std::endl;
+        s << ", removed = " << scope.get_is_removed();
+        s << ", lowest open transaction ID = " << scope.get_lowest_open_transaction_id().get_uint();
+        s << std::endl;
 
         if( m_database->get_journal_enabled()) {
             s << "    Journal last pruned visibility: "

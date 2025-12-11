@@ -1025,7 +1025,7 @@ void process_target_material(
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1> ...]\n"
         << "-h                      print this text\n"
         << "--target                distilling target:diffuse|ue4|transmissive_pbr|\n"
         << "                        specular_glossy (default: ue4)\n"

@@ -38,11 +38,11 @@
 
 // To reuse this sample code for the MDL SDK and MDL Core the corresponding namespaces are used.
 
-// when this CUDA code is used in the context of an SDK sample.
+// when this CUDA code is used in the context of an SDK example.
 #if defined(MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MI_NEURAYLIB_BSDF_USE_MATERIAL_IOR
     using namespace mi::neuraylib;
-// when this CUDA code is used in the context of an Core sample.
+// when this CUDA code is used in the context of an Core example.
 #elif defined(MDL_CORE_BSDF_USE_MATERIAL_IOR)
     #define BSDF_USE_MATERIAL_IOR MDL_CORE_BSDF_USE_MATERIAL_IOR
     using namespace mi::mdl;
@@ -83,9 +83,9 @@ extern __constant__ unsigned int     mdl_arg_block_indices[];
 extern __constant__ Mat_expr_func    *mdl_functions[];
 
 // The target code indices for the generated MDL sub-expression functions.
-// In contrast to the df_cuda sample, this example simply iterates over all generated expressions.
+// In contrast to the df_cuda example, this example simply iterates over all generated expressions.
 // Therefore, no target_code_indices and function_indices are passed from the host side.
-// Instead, this additional array allows the mapping to target_code_index. 
+// Instead, this additional array allows the mapping to target_code_index.
 extern __constant__ unsigned int     mdl_target_code_indices[];
 
 // Identity matrix.
@@ -173,7 +173,7 @@ extern "C" __global__ void evaluate_mat_expr(
         /*object_id=*/             0,
         /*meters_per_scene_unit=*/ 1.0f
     };
-    
+
     Tex_handler tex_handler;
     tex_handler.vtable       = &TEX_VTABLE;   // only required in 'vtable' mode, otherwise NULL
     tex_handler.num_textures = tc_data_list[tc_idx].num_textures;

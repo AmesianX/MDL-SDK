@@ -1042,11 +1042,10 @@ static void render_scene(
     CUfunction  cuda_function;
     char const *ptx_name = options.enable_derivatives ?
         "example_df_cuda_derivatives.ptx" : "example_df_cuda.ptx";
-    CUmodule    cuda_module = build_linked_kernel(
-        target_codes,
-        (mi::examples::io::get_executable_folder() + "/" + ptx_name).c_str(),
-        "render_scene_kernel",
-        &cuda_function);
+    std::string ptx_filename = mi::examples::mdl::find_shader_file(
+        MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
+    CUmodule cuda_module = build_linked_kernel(
+        target_codes, ptx_filename.c_str(), "render_scene_kernel", &cuda_function);
 
     // copy materials of the scene to the device
     CUdeviceptr material_buffer = 0;
@@ -2121,11 +2120,11 @@ bool contains_hair_bsdf(const mi::neuraylib::ICompiled_material* compiled_materi
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1|full_mdle_path1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1|absolute_mdle_path1> ...]\n"
         << "-h|--help                   print this text and exit\n"
         << "-v|--version                print the MDL SDK version string and exit\n"
         << "--device <id>               run on CUDA device <id> (default: 0)\n"
-        << "--nogl                      don't open interactive display\n"
+        << "--no_window                 don't open interactive display\n"
         << "--nocc                      don't use class-compilation\n"
         << "--noaux                     don't generate code for albedo and normal buffers\n"
         << "--nopdf                     don't generate code for pdf\n"
@@ -2139,13 +2138,13 @@ static void usage(const char *name)
         << "-o <outputfile>             image file to write result to (default: output.exr).\n"
         << "                            With multiple materials \"-<material index>\" will be\n"
         << "                            added in front of the extension\n"
-        << "--spp <num>                 samples per pixel, only active for --nogl (default: 4096)\n"
+        << "--spp <num>                 samples per pixel, only active for --no_window (default: 4096)\n"
         << "--spi <num>                 samples per render call (default: 8)\n"
         << "-t <type>                   0: eval, 1: sample, 2: mis, 3: mis + pdf, 4: no env\n"
         << "                            (default: 2)\n"
         << "-e <exposure>               exposure for interactive display (default: 0.0)\n"
         << "-f <fov>                    the camera field of view in degree (default: 96.0)\n"
-        << "--cam <x> <y> <z>           set the camera position (default 0 0 3).\n"
+        << "--camera <x> <y> <z>        set the camera position (default 0 0 3).\n"
         << "                            The camera will always look towards (0, 0, 0).\n"
         << "-l <x> <y> <z> <r> <g> <b>  add an isotropic point light with given coordinates and "
            "intensity (flux)\n"
@@ -2160,7 +2159,7 @@ static void usage(const char *name)
         << "\"transmit\" or \"reflect_and_transmit\" (default: restriction disabled)\n"
         << "\n"
         << "Note: material names can end with an '*' as a wildcard\n"
-        << "      and alternatively, full MDLE file paths can be passed as material name\n";
+        << "      and alternatively, absolute MDLE file paths can be passed as material name\n";
 
     exit(EXIT_FAILURE);
 }
@@ -2177,7 +2176,7 @@ int MAIN_UTF8(int argc, char* argv[])
         if (opt[0] == '-') {
             if (strcmp(opt, "--device") == 0 && i < argc - 1) {
                 options.cuda_device = atoi(argv[++i]);
-            } else if (strcmp(opt, "--nogl") == 0) {
+            } else if (strcmp(opt, "--no_window") == 0) {
                 options.opengl = false;
             } else if (strcmp(opt, "--nocc") == 0) {
                 options.use_class_compilation = false;
@@ -2219,7 +2218,7 @@ int MAIN_UTF8(int argc, char* argv[])
                 options.exposure = static_cast<float>(atof(argv[++i]));
             } else if (strcmp(opt, "-f") == 0 && i < argc - 1) {
                 options.fov = static_cast<float>(atof(argv[++i]));
-            } else if (strcmp(opt, "--cam") == 0 && i < argc - 3) {
+            } else if (strcmp(opt, "--camera") == 0 && i < argc - 3) {
                 options.cam_pos.x = static_cast<float>(atof(argv[++i]));
                 options.cam_pos.y = static_cast<float>(atof(argv[++i]));
                 options.cam_pos.z = static_cast<float>(atof(argv[++i]));

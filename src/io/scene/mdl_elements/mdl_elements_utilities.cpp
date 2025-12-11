@@ -7272,14 +7272,18 @@ const mi::mdl::IValue* Call_evaluator<T>::evaluate_intrinsic_function(
 {
     switch( semantic) {
         case mi::mdl::IDefinition::DS_INTRINSIC_DF_LIGHT_PROFILE_POWER:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && n_arguments == 1);
-            return fold_df_light_profile_power( value_factory, arguments[0]);
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && n_arguments == 1);
+                return fold_df_light_profile_power( value_factory, arguments[0]);
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_DF_LIGHT_PROFILE_MAXIMUM:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && n_arguments == 1);
-            return fold_df_light_profile_maximum( value_factory, arguments[0]);
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && n_arguments == 1);
+                return fold_df_light_profile_maximum( value_factory, arguments[0]);
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_DF_LIGHT_PROFILE_ISVALID:
             ASSERT( M_SCENE, arguments && n_arguments == 1);
@@ -7290,30 +7294,36 @@ const mi::mdl::IValue* Call_evaluator<T>::evaluate_intrinsic_function(
             return fold_df_bsdf_measurement_isvalid( value_factory, arguments[0]);
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_WIDTH:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 3));
-            return fold_tex_width(
-                value_factory,
-                arguments[0],
-                n_arguments >= 2 ? arguments[1] : nullptr,  // uvtile_arg
-                n_arguments >= 3 ? arguments[2] : nullptr); // frame_arg
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 3));
+                return fold_tex_width(
+                    value_factory,
+                    arguments[0],
+                    n_arguments >= 2 ? arguments[1] : nullptr,  // uvtile_arg
+                    n_arguments >= 3 ? arguments[2] : nullptr); // frame_arg
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_HEIGHT:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 3));
-            return fold_tex_height(
-                value_factory,
-                arguments[0],
-                n_arguments >= 2 ? arguments[1] : nullptr,  // uvtile_arg
-                n_arguments >= 3 ? arguments[2] : nullptr); // frame_arg
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 3));
+                return fold_tex_height(
+                    value_factory,
+                    arguments[0],
+                        n_arguments >= 2 ? arguments[1] : nullptr,  // uvtile_arg
+                        n_arguments >= 3 ? arguments[2] : nullptr); // frame_arg
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_DEPTH:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 2));
-            return fold_tex_depth(
-                value_factory,
-                arguments[0],
-                n_arguments >= 2 ? arguments[1] : nullptr); // frame_arg
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && (n_arguments >= 1 || n_arguments <= 2));
+                return fold_tex_depth(
+                    value_factory,
+                    arguments[0],
+                    n_arguments >= 2 ? arguments[1] : nullptr); // frame_arg
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_TEXTURE_ISVALID:
             ASSERT( M_SCENE, arguments && n_arguments == 1);
@@ -7332,23 +7342,30 @@ const mi::mdl::IValue* Call_evaluator<T>::evaluate_intrinsic_function(
             return fold_tex_depth_offset( value_factory, arguments[0], arguments[1]);
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_FIRST_FRAME:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && n_arguments == 1);
-            return fold_tex_first_frame( value_factory, arguments[0]);
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && n_arguments == 1);
+                return fold_tex_first_frame( value_factory, arguments[0]);
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_LAST_FRAME:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && n_arguments == 1);
-            return fold_tex_last_frame( value_factory, arguments[0]);
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && n_arguments == 1);
+                return fold_tex_last_frame( value_factory, arguments[0]);
+            }
+            break;
 
         case mi::mdl::IDefinition::DS_INTRINSIC_TEX_GRID_TO_OBJECT_SPACE:
-            ASSERT( M_SCENE, m_has_resource_attributes);
-            ASSERT( M_SCENE, arguments && n_arguments == 2);
-            return fold_tex_grid_to_object_space( value_factory, arguments[0], arguments[1]);
+            if( m_has_resource_attributes) {
+                ASSERT( M_SCENE, arguments && n_arguments == 2);
+                return fold_tex_grid_to_object_space( value_factory, arguments[0], arguments[1]);
+            }
+            break;
 
         default:
-            return value_factory->create_bad();
+            break;
     }
+    return value_factory->create_bad();
 }
 
 template<typename T>
@@ -8056,6 +8073,7 @@ Execution_context::Execution_context( bool add_defaults)
     ADD3( MDL_CTX_OPTION_KEEP_ORIGINAL_RESOURCE_FILE_PATHS, false, false);
     ADD3( MDL_CTX_OPTION_USER_DATA, empty_handle, true);
     ADD4( MDL_CTX_OPTION_TARGET_TYPE, empty_handle, true, validate_target_type);
+    ADD3( MDL_CTX_OPTION_RERUN_INLINING, false, false);
 
 #undef ADD3
 #undef ADD4

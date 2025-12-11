@@ -51,7 +51,7 @@ class Mdl_qt_plugin : public QQmlExtensionPlugin, public Mdl_qt_plugin_interface
 public:
     explicit Mdl_qt_plugin();
     virtual ~Mdl_qt_plugin() = default;
-    void registerTypes(const char *uri);
+    void registerTypes(const char *uri) override;
     void initializeEngine(QQmlEngine *engine, const char *uri) override;
     bool set_context(
         QQmlApplicationEngine* engine,

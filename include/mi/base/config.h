@@ -184,6 +184,10 @@
 
 #if defined(_MSC_VER)
 
+#if !defined(MI_COMPILER_CLANG) && defined(__clang__)
+#define MI_COMPILER_CLANG __clang__
+#endif // !defined(MI_COMPILER_CLANG) && defined(__clang__)
+
 #ifndef MI_SKIP_COMPILER_VERSION_CHECK
 #if (_MSC_VER < 1400)
 #error Microsoft Visual C++ compiler version is unsupported (smaller than 1400).

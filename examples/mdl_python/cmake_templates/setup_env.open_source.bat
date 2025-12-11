@@ -37,7 +37,7 @@ set @ENV_LIB_PATH@=@ENV_MDL_SDK_PATH_BAT@/@_CONFIG@;@ENV_OPENIMAGEIO_PATH_BAT@/@
 set PYTHONPATH=@BINDING_MODULE_PATH@/@_CONFIG@;%PYTHONPATH%
 
 :: Path of the examples to access the example content
-set MDL_SAMPLES_ROOT=@CMAKE_CURRENT_SOURCE_DIR@/../
+set MDL_EXAMPLES_ROOT=@CMAKE_CURRENT_SOURCE_DIR@/../
 
 :: Path of the examples to access the common modules
 set MDL_SRC_SHADERS_MDL=@MDL_SRC_FOLDER@/shaders/mdl/

@@ -2167,7 +2167,7 @@ void Section_material::bind_material(
 
     // collect the parameter info recursively
     std::function<void(mi::base::Handle<const mi::neuraylib::IValue>&, const char*, mi::neuraylib::Target_value_layout_state)>
-        collectParamInfoLambda = [&compiled_material, &argument_block, &argument_block_layout, &parameter_context, &collectParamInfoLambda](
+        collectParamInfoLambda = [&argument_block, &argument_block_layout, &parameter_context, &collectParamInfoLambda](
             mi::base::Handle<const mi::neuraylib::IValue>& value, const char* name,
             mi::neuraylib::Target_value_layout_state state)
     {

@@ -270,10 +270,10 @@ For the definitions of all structures and function prototypes see the top of \c 
 <b>Source Code Location:</b>
   <tt>examples/mdl_core/df_vulkan/display.vert</tt>
 
-\include df_vulkan/display.frag
+\include df_vulkan/display.vert
 
 <b>Source Code Location:</b>
-  <tt>examples/mdl_core/df_vulkan/display.vert</tt>
+  <tt>examples/mdl_core/df_vulkan/display.frag</tt>
 
 \include df_vulkan/display.frag
 

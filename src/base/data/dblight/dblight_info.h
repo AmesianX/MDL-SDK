@@ -210,8 +210,9 @@ public:
 
     /// Replaces the referenced element.
     ///
-    /// Only to be used for job results.
-    void set_element_from_job_execution( DB::Element_base* element);
+    /// Only to be used for job results. Moves the content of \p references into \c m_references.
+    void set_element_from_job_execution(
+        DB::Element_base* element, DB::Tag_set& references);
 
     /// Hook for Infos_per_name::m_infos.
     bi::set_member_hook<> m_infos_per_name_hook;
@@ -657,6 +658,17 @@ public:
         const char* name,
         bool temporary);
 
+    /// Stores a job result in the given info.
+    ///
+    /// \param element         The job result to store. RCS:TRO
+    /// \param info            The info of the job that was executed. RCS:NEU
+    /// \param references      The set of tags references by the DB element. The set is modified
+    ///                        by the call and must not be used anymore afterwards.
+    void store(
+        DB::Element_base* element,
+        Info_impl* info,
+        DB::Tag_set& references);
+
     /// Looks up an info for the given tag.
     ///
     /// \param tag                The tag to look up.
@@ -736,9 +748,10 @@ public:
 
     /// Runs the garbage collection.
     ///
-    /// \param lowest_open   The currently lowest ID of all open transactions (or the ID of the
-    ///                      next transaction if there are no open transactions).
-    void garbage_collection( DB::Transaction_id lowest_open);
+    /// \param update_lowest_open_transaction_ids   Indicates whether the lowest open transaction
+    ///     IDs should be updated first. This needs to be avoided when a scope is removed since it
+    ///     causes conflicts with the destructor of the scope being removed.
+    void garbage_collection( bool update_lowest_open_transaction_ids);
 
     /// Returns the pin count of the corresponding Infos_per_tag set.
     mi::Uint32 get_tag_reference_count( DB::Tag tag);
@@ -756,10 +769,8 @@ private:
     /// #cleanup_tag_with_pin_count_zero().
     ///
     /// \param tag             The tag to run the garbage collection on.
-    /// \param lowest_open     The currently lowest ID of all open transactions (or the ID of the
-    ///                        next transaction if there are no open transactions).
     /// \param[out] progress   Indicates whether any progress was made.
-    void cleanup_tag_general( DB::Tag, DB::Transaction_id lowest_open, bool& progress);
+    void cleanup_tag_general( DB::Tag, bool& progress);
 
     /// Runs the garbage collection for a particular tag with pin count zero.
     ///

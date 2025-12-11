@@ -545,7 +545,9 @@ public:
 
         m_code = m_target_code->get_code();
 #ifdef REMAP_NOISE_FUNCTIONS
-        m_code += read_text_file(get_executable_folder() + "/" + "noise_no_lut.glsl");
+        std::string noise_source = mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
+        m_code += noise_source;
 #endif
         m_code += m_defaults;
         add_texture_runtime();
@@ -1209,9 +1211,11 @@ public:
 
     Shader_program(const std::string& vertex_shader_file, const std::string& fragment_shader_file)
     {
-        m_program = create_shader_program(
-            read_text_file(vertex_shader_file),
-            read_text_file(fragment_shader_file));
+        std::string vertex_shader_source = mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, vertex_shader_file.c_str());
+        std::string fragment_shader_source = mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, fragment_shader_file.c_str());
+        m_program = create_shader_program(vertex_shader_source, fragment_shader_source);
     }
 
     Shader_program() : m_program(-1) {
@@ -1302,8 +1306,8 @@ public:
         // Get fragment code generated from MDL expressions
         std::string fragment_code = mdl_ue4->get_code();
         // Add main fragment shader
-        fragment_code += read_text_file(
-            mi::examples::io::get_executable_folder() + "/" + "example_distilling_glsl.frag");
+        fragment_code += mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY,  "example_distilling_glsl.frag");
 
 #ifdef DUMP_GLSL
         std::fstream file;
@@ -1312,9 +1316,9 @@ public:
         file.close();
 #endif
         // Compile and link shaders
-        m_program = create_shader_program(read_text_file(
-            mi::examples::io::get_executable_folder() + "/" + "example_distilling_glsl.vert"),
-            fragment_code);
+        std::string vertex_code = mi::examples::mdl::read_shader_file(
+            MDL_EXAMPLE_RELATIVE_DIRECTORY, "example_distilling_glsl.vert");
+        m_program = create_shader_program(vertex_code, fragment_code);
 
         // Assign texture slots for IBL maps
         make_current();
@@ -1767,9 +1771,7 @@ static GLuint prefilter_glossy(GLsizei w, GLsizei h, GLuint env_tex_id, GLuint e
         GL_TEXTURE_CUBE_MAP, w, h, GL_RGB, nullptr, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
-    Shader_program program(
-        mi::examples::io::get_executable_folder() + "/" + "screen_aligned_quad.vert",
-        mi::examples::io::get_executable_folder() + "/" + "prefilter_glossy.frag");
+    Shader_program program("screen_aligned_quad.vert", "prefilter_glossy.frag");
     Screen_aligned_quad quad;
     quad.bind_shader(&program);
 
@@ -1853,9 +1855,7 @@ static GLuint prefilter_diffuse(GLsizei w, GLsizei h, GLuint env_tex_id, GLuint 
     mv[4].lookat(pos, mi::Float32_3(0.0f, 0.0f, 1.0f), mi::Float32_3(0.0f, -1.0f, 0.0f));
     mv[5].lookat(pos, mi::Float32_3(0.0f, 0.0f, -1.0f), mi::Float32_3(0.0f, -1.0f, 0.0f));
 
-    Shader_program program(
-        mi::examples::io::get_executable_folder() + "/" + "screen_aligned_quad.vert",
-        mi::examples::io::get_executable_folder() + "/" + "prefilter_diffuse.frag");
+    Shader_program program("screen_aligned_quad.vert", "prefilter_diffuse.frag");
     Screen_aligned_quad quad;
     quad.bind_shader(&program);
 
@@ -1912,9 +1912,7 @@ GLuint create_offscreen_render_target(GLsizei w, GLsizei h, GLuint& out_fb, GLui
 // http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
 GLuint integrate_brdf(GLsizei w, GLsizei h)
 {
-    Shader_program program(
-        mi::examples::io::get_executable_folder() + "/" + "integrate_brdf.vert",
-        mi::examples::io::get_executable_folder() + "/" + "integrate_brdf.frag");
+    Shader_program program("integrate_brdf.vert", "integrate_brdf.frag");
     Screen_aligned_quad quad;
     GLuint fbo=0, rbo=0;
     GLuint tex_id = create_offscreen_render_target(w, h, fbo, rbo);
@@ -2234,9 +2232,7 @@ void render_scene(
         Sphere sphere(1.f, 64, 64);
         sphere.bind_shader(sphere_shader);
 
-        Shader_program env_shader(
-            mi::examples::io::get_executable_folder() + "/" + "screen_aligned_quad.vert",
-            mi::examples::io::get_executable_folder() + "/" + "environment_sphere.frag");
+        Shader_program env_shader("screen_aligned_quad.vert", "environment_sphere.frag");
         Screen_aligned_quad quad;
         quad.bind_shader(&env_shader);
 
@@ -2484,9 +2480,9 @@ mi::neuraylib::ICompiled_material* compile_material(
 static void usage(const char *name)
 {
     std::cout
-        << "usage: " << name << " [options] [<material_name1> ...]\n"
+        << "Usage: " << name << " [options] [<material_name1> ...]\n"
         << "-h                       print this text\n"
-        << "--nowin                  don't open interactive display\n"
+        << "--no_window              don't open interactive display\n"
         << "--hdr <filename>         HDR environment map (default: textures/environment.hdr)\n"
         << "-o <outputfile>          image file to write result to (default: output.exr)\n"
         << "-e <exposure>            exposure for interactive display (default: 0.0)\n"
@@ -2507,7 +2503,7 @@ int MAIN_UTF8(int argc, char* argv[])
     for (int i = 1; i < argc; ++i) {
         const char *opt = argv[i];
         if (opt[0] == '-') {
-            if (strcmp(opt, "--nowin") == 0) {
+            if (strcmp(opt, "--no_window") == 0) {
                 options.show_window = false;
             } else if (strcmp(opt, "--mdl_path") == 0 && i < argc - 1) {
                 configure_options.additional_mdl_paths.push_back(argv[++i]);

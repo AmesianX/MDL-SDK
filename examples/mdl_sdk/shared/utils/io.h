@@ -45,7 +45,7 @@
 
 #include <mi/base/config.h>
 
-#include "utils/strings.h"
+#include "utils/sdk_strings.h"
 
 #ifdef MI_PLATFORM_WINDOWS
     #include <windows.h>

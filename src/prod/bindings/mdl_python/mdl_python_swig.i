@@ -101,11 +101,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
-#ifdef IRAY_SDK
-    #include "mi/neuraylib.h"
-#else
-    #include "mi/mdl_sdk.h"
-#endif
+#include "mi/mdl_sdk.h"
 
 #include "mdl_python.h"
 
@@ -2166,11 +2162,7 @@ EXTEND_FUNCTION_AS(mi::neuraylib::ITransaction, edit)
 %apply bool & INOUT{ bool & is_constant }; // simlar for output references
 
 // Note, the order of the includes is important here !
-#ifdef IRAY_SDK
-    %include "mi/neuraylib.h"
-#else
-    %include "mi/mdl_sdk.h"
-#endif
+%include "mi/mdl_sdk.h"
 
 %include "mi/neuraylib/version.h"
 %include "mi/neuraylib/iattribute_set.h"
@@ -2473,3 +2465,4 @@ extern mi::neuraylib::INeuray* load_and_get_ineuray(const char*);
 extern bool load_plugin(mi::neuraylib::INeuray*, const char*);
 extern int unload();
 #endif
+

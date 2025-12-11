@@ -130,7 +130,7 @@ void MDL_module_scanner::scan_module(const std::string& qualified_module_name)
     // Create execution context.
     mi::base::Handle<mi::neuraylib::IMdl_impexp_api>
         mdl_impexp_api(m_neuray->get_api_component<mi::neuraylib::IMdl_impexp_api>());
-    
+
     mi::base::Handle <mi::neuraylib::IMdl_execution_context>
         context(m_mdl_factory->create_execution_context());
 
@@ -490,7 +490,7 @@ options:
 
   -h|--help                 Print this usage message and exit.
   -p|--mdl_path <path>      Add the given path to the MDL search path.
-  -n|--nostdpath            Prevent adding the MDL system and user search
+  -n|--nostdpath            Prevent adding the MDL system, user, and example search
                             path(s) to the MDL search path.
   -f|--filter               Select type of information to be dumped.
                               Format: -f "type1|type2|...|typeN".
