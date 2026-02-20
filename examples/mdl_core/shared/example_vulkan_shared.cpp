@@ -199,7 +199,7 @@ glslang::TShader::Includer::IncludeResult* Glsl_compiler::Simple_file_includer::
         filename = filename.substr(2);
 
     if (!is_absolute_path(filename)) {
-        std::string result = find_shader_file(
+        std::string result = find_resource_file(
             m_relative_directory.c_str(), filename.c_str());
         if (!result.empty())
             filename = result;
@@ -272,7 +272,7 @@ void Vulkan_base_app::run(const Config& config)
             VkPresentInfoKHR present_info = {};
             present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
             present_info.waitSemaphoreCount = 1;
-            present_info.pWaitSemaphores = &m_render_finished_semaphores[frame_index];
+            present_info.pWaitSemaphores = &m_render_finished_semaphores[image_index];
             present_info.swapchainCount = 1;
             present_info.pSwapchains = &m_swapchain;
             present_info.pImageIndices = &image_index;
@@ -1213,6 +1213,14 @@ void Vulkan_base_app::recreate_swapchain_or_framebuffer_image()
     for (VkFence fence : m_frame_inflight_fences)
         vkDestroyFence(m_device, fence, nullptr);
 
+    // Semaphores must be recreated to match the new swapchain image count
+    for (VkSemaphore sem : m_image_available_semaphores)
+        vkDestroySemaphore(m_device, sem, nullptr);
+    for (VkSemaphore sem : m_render_finished_semaphores)
+        vkDestroySemaphore(m_device, sem, nullptr);
+    m_image_available_semaphores.clear();
+    m_render_finished_semaphores.clear();
+
     // Recreate swapchain related resources
     if (m_config.headless)
         init_swapchain_for_headless();
@@ -1264,7 +1272,7 @@ void Vulkan_base_app::render_loop_iteration(uint32_t frame_index, uint32_t image
         submit_info.pWaitSemaphores = &m_image_available_semaphores[frame_index];
         submit_info.pWaitDstStageMask = &wait_stage;
         submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = &m_render_finished_semaphores[frame_index];
+        submit_info.pSignalSemaphores = &m_render_finished_semaphores[image_index];
     }
 
     VK_CHECK(vkQueueSubmit(
@@ -1505,7 +1513,7 @@ VkShaderModule create_shader_module_from_file(
     EShLanguage shader_type,
     const std::vector<std::string>& defines, bool optimize)
 {
-    std::string shader_source = read_shader_file( relative_directory, shader_filename);
+    std::string shader_source = read_resource_file( relative_directory, shader_filename);
     return create_shader_module_from_sources(
         device, { shader_source }, relative_directory, shader_type, defines, optimize);
 }

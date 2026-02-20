@@ -135,29 +135,37 @@ std::string add_missing_material_signature(
     const mi::neuraylib::IModule* module,
     const std::string& material_name);
 
-/// Finds the location of a shader file.
+/// Finds the location of a resource directory.
 ///
 /// Considers the directory of the executable first, then the one indicated by
 /// \p relative_directory.
 ///
-/// Despite its name the function can also be used for other types of files that are located
-/// next to the example, e.g., resource files.
-///
 /// \param relative_directory   The location relative to the root directory of the examples.
-/// \param shader_filename      The name of the shader file.
+/// \param resource_dirname     The name of the resource directory.
 /// \return                     The found location, or the empty string in case of failure.
-std::string find_shader_file(
-    const char* relative_directory, const char* shader_filename);
+std::string find_resource_directory(
+    const char* relative_directory, const char* resource_dirname);
 
-/// Reads the contents of a shader file.
+/// Finds the location of a resource file.
 ///
 /// Considers the directory of the executable first, then the one indicated by
 /// \p relative_directory.
 ///
 /// \param relative_directory   The location relative to the root directory of the examples.
-/// \param shader_filename      The name of the shader file.
+/// \param resource_filename    The name of the resource file.
 /// \return                     The found location, or the empty string in case of failure.
-std::string read_shader_file(const char* relative_directory, const char* shader_filename);
+std::string find_resource_file(
+    const char* relative_directory, const char* resource_filename);
+
+/// Reads the contents of a resource file.
+///
+/// Considers the directory of the executable first, then the one indicated by
+/// \p relative_directory.
+///
+/// \param relative_directory   The location relative to the root directory of the examples.
+/// \param resource_filename    The name of the resource file.
+/// \return                     The found location, or the empty string in case of failure.
+std::string read_resource_file(const char* relative_directory, const char* resource_filename);
 
 }}}
 

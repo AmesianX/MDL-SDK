@@ -3195,7 +3195,7 @@ int MAIN_UTF8(int argc, char *argv[])
                     ImGuiCond_FirstUseEver);
                 ImGui::Begin("Settings");
                 ImGui::SetWindowFontScale(1.f);
-                ImGui::PushItemWidth(-200.f);
+                ImGui::PushItemWidth(150.f);
                 if (options.use_class_compilation)
                     ImGui::Text("CTRL + Click to manually enter numbers");
                 else

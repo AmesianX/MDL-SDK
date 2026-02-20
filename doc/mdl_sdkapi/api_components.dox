@@ -58,6 +58,7 @@ configuration interfaces), while other API components might only be available wh
   <tr><td>#mi::neuraylib::IMdle_api                </td><td>no </td></tr>
   <tr><td>#mi::neuraylib::IPlugin_api              </td><td>yes</td></tr>
   <tr><td>#mi::neuraylib::IPlugin_configuration    </td><td>yes</td></tr>
+  <tr><td>#mi::neuraylib::IScheduling_configuration</td><td>yes</td></tr>
   <tr><td>#mi::neuraylib::IVersion                 </td><td>yes</td></tr>
 </table>
 

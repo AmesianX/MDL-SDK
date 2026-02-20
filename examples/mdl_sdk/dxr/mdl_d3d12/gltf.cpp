@@ -847,6 +847,12 @@ bool Loader_gltf::load(Mdl_sdk& sdk, const std::string& file_name, const Scene_o
                 else if (att.first == "TANGENT")    layout_index = 2;
                 else
                 {
+                    if (acc.componentType != fx::gltf::Accessor::ComponentType::Float)
+                    {
+                        log_warning("Ignored vertex attribute '" + att.first + "' because non-float attributes are not yest supported");
+                        continue;
+                    }
+
                     switch (acc.type)
                     {
                         case fx::gltf::Accessor::Type::Scalar:

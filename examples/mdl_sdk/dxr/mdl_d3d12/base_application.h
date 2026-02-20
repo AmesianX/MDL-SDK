@@ -139,6 +139,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
             , use_class_compilation(true)
             , fold_all_bool_parameters(false)
             , force_single_threading(false)
+            , no_shader_collections(false)
             , no_gui(false)
             , no_console_window(false)
             , hide_gui(false)
@@ -196,6 +197,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
         bool use_class_compilation;
         bool fold_all_bool_parameters;
         bool force_single_threading;
+        bool no_shader_collections;
         bool no_gui;
         bool no_console_window;
         bool hide_gui;

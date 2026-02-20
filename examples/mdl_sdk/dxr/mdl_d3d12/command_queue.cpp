@@ -65,7 +65,7 @@ Command_queue::Command_queue(Base_application* app, D3D12_COMMAND_LIST_TYPE type
 
 Command_queue::~Command_queue()
 {
-    m_mtx.lock();
+    auto lock = std::unique_lock<std::mutex>(m_mtx);
     m_all_command_allocators.clear();
     while (!m_command_allocator_queue.empty())
         m_command_allocator_queue.pop();
@@ -76,8 +76,6 @@ Command_queue::~Command_queue()
 
     if (m_fence)
         delete m_fence;
-
-    m_mtx.unlock();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -87,36 +85,37 @@ D3DCommandList* Command_queue::get_command_list()
     ID3D12CommandAllocator* command_allocator = nullptr;
     D3DCommandList* command_list = nullptr;
 
-    m_mtx.lock();
-    if (!m_command_allocator_queue.empty() &&
-        m_fence->is_completed(m_command_allocator_queue.front().handle))
     {
-        command_allocator = m_command_allocator_queue.front().allocator;
-        m_command_allocator_queue.pop();
-        throw_on_failure(command_allocator->Reset(),
-            "Failed to reset command allocator", SRC);
-    }
-    else
-    {
-        ComPtr<ID3D12CommandAllocator> new_allocator = create_command_allocator();
-        m_all_command_allocators.push_back(new_allocator);
-        command_allocator = new_allocator.Get();
-    }
+        std::scoped_lock<std::mutex> lock(m_mtx);
+        if (!m_command_allocator_queue.empty() &&
+            m_fence->is_completed(m_command_allocator_queue.front().handle))
+        {
+            command_allocator = m_command_allocator_queue.front().allocator;
+            m_command_allocator_queue.pop();
+            throw_on_failure(command_allocator->Reset(),
+                "Failed to reset command allocator", SRC);
+        }
+        else
+        {
+            ComPtr<ID3D12CommandAllocator> new_allocator = create_command_allocator();
+            m_all_command_allocators.push_back(new_allocator);
+            command_allocator = new_allocator.Get();
+        }
 
-    if (!m_free_command_list_queue.empty())
-    {
-        command_list = m_free_command_list_queue.front();
-        m_free_command_list_queue.pop();
-        throw_on_failure(command_list->Reset(command_allocator, nullptr),
-            "Failed to reset command list", SRC);
+        if (!m_free_command_list_queue.empty())
+        {
+            command_list = m_free_command_list_queue.front();
+            m_free_command_list_queue.pop();
+            throw_on_failure(command_list->Reset(command_allocator, nullptr),
+                "Failed to reset command list", SRC);
+        }
+        else
+        {
+            ComPtr<D3DCommandList> new_list = create_command_list(command_allocator);
+            m_all_command_lists.push_back(new_list);
+            command_list = m_all_command_lists.back().Get();
+        }
     }
-    else
-    {
-        ComPtr<D3DCommandList> new_list = create_command_list(command_allocator);
-        m_all_command_lists.push_back(new_list);
-        command_list = m_all_command_lists.back().Get();
-    }
-    m_mtx.unlock();
 
     ID3D12CommandAllocator* pd_allocator[1] = {command_allocator};
     command_list->SetPrivateData(
@@ -152,13 +151,12 @@ UINT64 Command_queue::execute_command_list(D3DCommandList* command_list)
     ID3D12CommandList* const ppCommandLists[] = { command_list };
 
     // TODO batch command lists instead of waiting
-    m_mtx.lock();
+    std::scoped_lock<std::mutex> lock(m_mtx);
     m_command_queue->ExecuteCommandLists(1, ppCommandLists);
     UINT64 handle = m_fence->signal();
 
     m_command_allocator_queue.emplace(Allocator_queue_item{handle, allocator});
     m_free_command_list_queue.emplace(command_list);
-    m_mtx.unlock();
 
     return handle;
 }
@@ -224,11 +222,10 @@ Fence::~Fence()
 
 UINT64 Fence::signal()
 {
-    m_mtx.lock();
+    auto lock = std::unique_lock<std::mutex>(m_mtx);
     UINT64 handle = m_fence_value++;
     throw_on_failure(m_command_queue->get_queue()->Signal(m_fence.Get(), handle),
         "Failed to signal fence.", SRC);
-    m_mtx.unlock();
     return handle;
 }
 
@@ -250,15 +247,38 @@ bool Fence::wait(UINT64 handle) const
         // higher value can be overwritten by lower values, causing the event
         // to be triggered too early. Making all threads wait for the largest
         // value encountered so far fixes this.
-        m_mtx.lock();
-        m_wait_value = std::max(m_wait_value, handle);
-        m_mtx.unlock();
+        {
+            auto lock = std::unique_lock<std::mutex>(m_mtx);
+            m_wait_value = std::max(m_wait_value, handle);
+            throw_on_failure(m_fence->SetEventOnCompletion(m_wait_value, m_fence_event),
+                "Failed to wait on fence", SRC);
+        }
 
-        throw_on_failure(m_fence->SetEventOnCompletion(m_wait_value, m_fence_event),
-            "Failed to wait on fence", SRC);
+        while (true)
+        {
+            DWORD wait_result = WaitForSingleObjectEx(m_fence_event, 1000, FALSE);
+            UINT64 current = m_fence->GetCompletedValue();
 
-        WaitForSingleObjectEx(m_fence_event, INFINITE, FALSE);
-        return m_fence->GetCompletedValue() >= handle;
+            // we passed the signal so we are fine independent of the wait_result
+            if (current >= handle)
+                return true;
+
+            if (wait_result == WAIT_TIMEOUT)
+            {
+                // if not, we really have a timeout because of a long operation
+                // note, this will also show in case a frame takes longer than the timeout
+                log_info(mi::examples::strings::format(
+                    "Waiting for GPU task (currently: %lu  waiting for: %lu  latest: %lu)", 
+                    current, m_wait_value, m_fence_value-1));
+                continue;
+            }
+
+            // waiting failed unexpectedly
+            DWORD last_error = GetLastError();
+            std::string message = "Waiting for GPU task failed with code: " + std::to_string(last_error);
+            log_error(message);
+            return false;
+        }
     }
     return true;
 }

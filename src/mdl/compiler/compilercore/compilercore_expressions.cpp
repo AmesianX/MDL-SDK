@@ -877,6 +877,27 @@ public:
 
                         IExpression const *expr = get_argument(0)->get_argument_expr();
                         IValue const      *val  = expr->fold(module, factory, handler);
+
+                        if (handler != NULL && is<IType_int>(dst_type)) {
+                            if (is<IValue_float>(val)) {
+                                float f = cast<IValue_float>(val)->get_value();
+                                if (std::isnan(f) || std::isinf(f)) {
+                                    // invalid float operation: converting NaN or Inf to int
+                                    handler->exception(
+                                        IConst_fold_handler::ER_INVALID_FLOAT_OPERATION, expr);
+                                    return factory->create_bad();
+                                }
+                            }
+                            if (is<IValue_double>(val)) {
+                                double d = cast<IValue_double>(val)->get_value();
+                                if (std::isnan(d) || std::isinf(d)) {
+                                    // invalid float operation: converting NaN or Inf to int
+                                    handler->exception(
+                                        IConst_fold_handler::ER_INVALID_FLOAT_OPERATION, expr);
+                                    return factory->create_bad();
+                                }
+                            }
+                        }
                         return val->convert(factory, dst_type);
                     }
                 case IDefinition::DS_ELEM_CONSTRUCTOR:

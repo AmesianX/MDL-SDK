@@ -965,7 +965,7 @@ private:
             // Build the full CUDA kernel with all the generated code
             CUfunction  cuda_function;
             char const *ptx_name = "example_distilling_unity.ptx";
-            std::string ptx_filename = mi::examples::mdl::find_shader_file(
+            std::string ptx_filename = mi::examples::mdl::find_resource_file(
                 MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
 
             std::vector <mi::base::Handle<const mi::neuraylib::ITarget_code>> target_codes;

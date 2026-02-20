@@ -97,7 +97,7 @@ mi::neuraylib::ICanvas *bake_expression_cuda_ptx(
     CUfunction  cuda_function;
     char const *ptx_name = options.enable_derivatives ?
         "example_execution_cuda_derivatives.ptx" : "example_execution_cuda.ptx";
-    std::string ptx_filename = mi::examples::mdl::find_shader_file(
+    std::string ptx_filename = mi::examples::mdl::find_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
     CUmodule cuda_module = build_linked_kernel(
         target_codes, ptx_filename.c_str(), "evaluate_mat_expr", &cuda_function);

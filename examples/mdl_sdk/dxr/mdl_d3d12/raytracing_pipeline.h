@@ -43,12 +43,14 @@ namespace mi { namespace examples { namespace mdl_d3d12
     class Vertex_buffer;
     class Index_buffer;
     class Shader_library;
+    class Shader_collection;
 
     // --------------------------------------------------------------------------------------------
 
     class Raytracing_pipeline
     {
         friend class Shader_binding_tables;
+        friend class Shader_collection;
 
         // --------------------------------------------------------------------
 
@@ -77,12 +79,12 @@ namespace mi { namespace examples { namespace mdl_d3d12
         struct Root_signature_association
         {
             explicit Root_signature_association(
-                Root_signature* signature,
+                const Root_signature* signature,
                 bool owns_signature,
                 const std::vector<std::string>& symbols);
 
-            Root_signature* m_root_signature;
-            ID3D12RootSignature* m_signature;
+            const Root_signature* m_root_signature;
+            const ID3D12RootSignature* m_signature;
             bool m_owns_root_signature;
             std::vector<std::wstring> m_symbols;
             std::vector<LPCWSTR> m_symbol_pointers;
@@ -94,6 +96,73 @@ namespace mi { namespace examples { namespace mdl_d3d12
     public:
         explicit Raytracing_pipeline(Base_application* app, std::string debug_name);
         virtual ~Raytracing_pipeline();
+
+        Shader_collection& create_collection(const std::string& debug_name);
+
+        /// Complete the setup of the object in order to be used for rendering.
+        ///
+        /// Afterwards, no changes to the object are allowed anymore.
+        bool finalize();
+
+        /// Set the payload size which defines the maximum size of the data carried by the rays.
+        ///
+        /// Keep this value as low as possible.
+        void set_max_payload_size(size_t size_in_byte) {
+            m_max_payload_size_in_byte = size_in_byte;
+        }
+        size_t get_max_payload_size() const { return m_max_payload_size_in_byte; }
+
+        /// Size of the data that is provided for each hit.
+        ///
+        /// Usually, this contains barycentric coordinates. 2 float values, as all 3 sum up to 1.0f.
+        void set_max_attribute_size(size_t size_in_byte) {
+            m_max_attribute_size_in_byte = size_in_byte;
+        }
+        size_t get_max_attribute_size() const { return m_max_attribute_size_in_byte; }
+
+        /// The ray tracing process can shoot rays from existing hit points
+        /// and this sets the number of allowed indirections.
+        void set_max_recursion_depth(size_t depth) { m_max_recursion_depth = depth; }
+        size_t get_max_recursion_depth() const { return m_max_recursion_depth; }
+
+        /// Ray tracing pipeline state properties,
+        /// retaining the shader identifiers to use in the Shader Binding Table
+        ID3D12StateObjectProperties* get_state_properties() {
+            return m_pipeline_state_properties.Get();
+        }
+
+        /// Get the state that has to bound using the command list before casting rays.
+        ID3D12StateObject* get_state() { return m_pipeline_state.Get(); }
+
+        /// Get the global root signature of this pipeline
+        Root_signature* get_global_root_signature() { return m_global_root_signature; }
+
+        /// Get the global root signature of this pipeline
+        const Root_signature* get_global_root_signature() const { return m_global_root_signature; }
+
+    private:
+        Base_application* m_app;
+        std::string m_debug_name;
+        bool m_is_finalized;
+        size_t m_max_payload_size_in_byte;
+        size_t m_max_attribute_size_in_byte;
+        size_t m_max_recursion_depth;
+
+        std::vector<Shader_collection*> m_collections;
+
+        Root_signature* m_global_root_signature;
+
+        ComPtr<ID3D12StateObject> m_pipeline_state;
+        ComPtr<ID3D12StateObjectProperties> m_pipeline_state_properties;
+    };
+
+    // --------------------------------------------------------------------------------------------
+
+    class Shader_collection : public Resource
+    {
+    public:
+        explicit Shader_collection(Base_application* app, const Raytracing_pipeline* parent_pipeline, std::string debug_name);
+        virtual ~Shader_collection();
 
         /// Add a DXIL library to the pipeline.
         ///
@@ -131,58 +200,42 @@ namespace mi { namespace examples { namespace mdl_d3d12
         /// Complete the setup of the object in order to be used for rendering.
         ///
         /// Afterwards, no changes to the object are allowed anymore.
-        bool finalize();
+        /// 
+        /// \param pipeline_subobjects  A list must only be passed if shader collections are disabled.
+        bool finalize(std::vector<D3D12_STATE_SUBOBJECT>* pipeline_subobjects = nullptr);
 
-        /// Set the payload size which defines the maximum size of the data carried by the rays.
-        ///
-        /// Keep this value as low as possible.
-        void set_max_payload_size(size_t size_in_byte) {
-            m_max_payload_size_in_byte = size_in_byte;
+        /// Get libraries needed for pipeline state creation.
+        const std::vector<Shader_library>& get_libraries() const { return m_libraries; }
+
+        /// Get hitgroups needed for pipeline state creation.
+        const std::vector<Raytracing_pipeline::Hitgroup>& get_hitgroups() const { return m_hitgroups; }
+
+        /// Get signature associations needed for pipeline state creation.
+        const std::vector<Raytracing_pipeline::Root_signature_association>& get_signature_associations() const { 
+            return m_signature_associations;
         }
 
-        /// Size of the data that is provided for each hit.
-        ///
-        /// Usually, this contains barycentric coordinates. 2 float values, as all 3 sum up to 1.0f.
-        void set_max_attribute_size(size_t size_in_byte) {
-            m_max_attribute_size_in_byte = size_in_byte;
-        }
+        /// Get the state that used during pipeline finalization.
+        ID3D12StateObject* get_state() { return m_state_object.Get(); }
 
-        /// The ray tracing process can shoot rays from existing hit points
-        /// and this sets the number of allowed indirections.
-        void set_max_recursion_depth(size_t depth) { m_max_recursion_depth = depth; }
-
-        /// Ray tracing pipeline state properties,
-        /// retaining the shader identifiers to use in the Shader Binding Table
-        ID3D12StateObjectProperties* get_state_properties() {
-            return m_pipeline_state_properties.Get();
-        }
-
-        /// Get the state that has to bound using the command list before casting rays.
-        ID3D12StateObject* get_state() { return m_pipeline_state.Get(); }
-
-        Root_signature* get_global_root_signature() { return m_global_root_signature; }
+        std::string get_debug_name() const override { return m_debug_name; }
+        bool is_finialized() const { return m_is_finalized; }
 
     private:
         Base_application* m_app;
-        std::string m_debug_name;
-        bool m_is_finalized;
-        size_t m_max_payload_size_in_byte;
-        size_t m_max_attribute_size_in_byte;
-        size_t m_max_recursion_depth;
-
+        const Raytracing_pipeline* m_parent_pipeline;
         std::vector<Shader_library> m_libraries;
-        std::vector<Hitgroup> m_hitgroups;
-        std::vector<Root_signature_association> m_signature_associations;
+        std::vector<Raytracing_pipeline::Hitgroup> m_hitgroups;
+        std::vector<Raytracing_pipeline::Root_signature_association> m_signature_associations;
         std::unordered_map<std::string, Root_signature*> m_signature_map;
 
         std::unordered_set<std::wstring> m_all_exported_symbols;
         std::unordered_set<std::wstring> m_all_associated_symbols;
 
-        Root_signature* m_dummy_local_root_signature;
-        Root_signature* m_global_root_signature;
+        ComPtr<ID3D12StateObject> m_state_object;
 
-        ComPtr<ID3D12StateObject> m_pipeline_state;
-        ComPtr<ID3D12StateObjectProperties> m_pipeline_state_properties;
+        std::string m_debug_name;
+        bool m_is_finalized;
     };
 
     // --------------------------------------------------------------------------------------------

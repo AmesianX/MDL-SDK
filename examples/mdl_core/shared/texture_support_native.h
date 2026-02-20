@@ -688,7 +688,7 @@ void df_bsdf_measurement_albedos(
 // ------------------------------------------------------------------------------------------------
 // Normal adaption (dummy functions)
 //
-// Can be enabled via backend option "use_renderer_adapt_normal".
+// Can be enabled via backend option "jit_use_renderer_adapt_normal".
 // ------------------------------------------------------------------------------------------------
 
 #ifndef TEX_SUPPORT_NO_DUMMY_ADAPTNORMAL
@@ -966,6 +966,7 @@ mi::mdl::Texture_handler_vtable tex_vtable = {
     df_bsdf_measurement_sample,
     df_bsdf_measurement_pdf,
     df_bsdf_measurement_albedos,
+    adapt_normal,
     scene_data_isvalid,
     scene_data_lookup_float,
     scene_data_lookup_float2,
@@ -1011,6 +1012,7 @@ mi::mdl::Texture_handler_deriv_vtable tex_deriv_vtable = {
     df_bsdf_measurement_sample,
     df_bsdf_measurement_pdf,
     df_bsdf_measurement_albedos,
+    adapt_normal,
     scene_data_isvalid,
     scene_data_lookup_float,
     scene_data_lookup_float2,

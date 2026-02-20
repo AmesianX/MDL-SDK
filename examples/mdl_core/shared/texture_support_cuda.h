@@ -83,6 +83,8 @@ struct Texture_handler_deriv : mi::mdl::Texture_handler_deriv_base {
 };
 
 
+#if defined(__CUDACC__)
+
 // Stores a float4 in a float[4] array.
 __device__ inline void store_result4(float res[4], const float4 &v)
 {
@@ -667,6 +669,30 @@ extern "C" __device__ void df_bsdf_measurement_albedos(
 
 
 // ------------------------------------------------------------------------------------------------
+// Normal adaption (dummy functions)
+//
+// Can be enabled via backend option "jit_use_renderer_adapt_normal".
+// ------------------------------------------------------------------------------------------------
+
+#ifndef TEX_SUPPORT_NO_DUMMY_ADAPTNORMAL
+
+// Implementation of adapt_normal().
+extern "C" __device__ void adapt_normal(
+    float                                  result[3],
+    Texture_handler_base const            *self_base,
+    Shading_state_material                *state,
+    float const                            normal[3])
+{
+    // just return original normal
+    result[0] = normal[0];
+    result[1] = normal[1];
+    result[2] = normal[2];
+}
+
+#endif  // TEX_SUPPORT_NO_DUMMY_ADAPTNORMAL
+
+
+// ------------------------------------------------------------------------------------------------
 // Scene data (dummy functions)
 // ------------------------------------------------------------------------------------------------
 
@@ -897,6 +923,7 @@ extern "C" __device__ void scene_data_lookup_deriv_float(
 // Vtables
 // ------------------------------------------------------------------------------------------------
 
+#ifndef TEX_SUPPORT_NO_VTABLES
 // The vtable containing all texture access handlers required by the generated code
 // in "vtable" mode.
 __device__ mi::mdl::Texture_handler_vtable tex_vtable = {
@@ -924,6 +951,7 @@ __device__ mi::mdl::Texture_handler_vtable tex_vtable = {
     df_bsdf_measurement_sample,
     df_bsdf_measurement_pdf,
     df_bsdf_measurement_albedos,
+    adapt_normal,
     scene_data_isvalid,
     scene_data_lookup_float,
     scene_data_lookup_float2,
@@ -964,6 +992,7 @@ __device__ mi::mdl::Texture_handler_deriv_vtable tex_deriv_vtable = {
     df_bsdf_measurement_sample,
     df_bsdf_measurement_pdf,
     df_bsdf_measurement_albedos,
+    adapt_normal,
     scene_data_isvalid,
     scene_data_lookup_float,
     scene_data_lookup_float2,
@@ -981,5 +1010,8 @@ __device__ mi::mdl::Texture_handler_deriv_vtable tex_deriv_vtable = {
     scene_data_lookup_deriv_float4,
     scene_data_lookup_deriv_color,
 };
+#endif  // TEX_SUPPORT_NO_VTABLES
+
+#endif  // __CUDACC__
 
 #endif  // TEXTURE_SUPPORT_CUDA_H

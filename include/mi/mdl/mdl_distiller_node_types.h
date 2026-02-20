@@ -189,6 +189,7 @@ enum Mdl_node_type_enum {
     edf_conditional_operator,
     vdf_conditional_operator,
     local_normal,
+    bsdf_marker,
 };
 
 

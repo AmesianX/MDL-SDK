@@ -69,7 +69,7 @@ bool Mdl_material_description_loader_mtlx::generate_mdl_source_code(
     std::string& out_generated_mdl_code,
     std::string& out_generated_mdl_name) const
 {
-    mi::examples::materialx::Mdl_generator mtlx2mdl;
+    mi::examples::materialx::Mdl_generator mtlx2mdl(MDL_EXAMPLE_RELATIVE_DIRECTORY);
     mi::examples::materialx::Mdl_generator_result result;
 
     // set the material file to load

@@ -1502,7 +1502,20 @@ void Compilation_unit::output_cpp_rule_match1(
             }
 
             // Check the node's type if needed:
-            if (sema == mi::mdl::IDefinition::DS_INVALID_REF_CONSTRUCTOR) {
+            if (sema == mi::mdl::IDefinition::DS_UNKNOWN) {
+                // TODO: Change to match on distiller semantics for bsdf_marker() once get_node_properties() is
+                // changed.
+                // 
+                // The bsdf_marker() special node has unknown semantics and bsdf return type.
+                // FIXME: Generalize for more markers
+                if (Expr_ref const *ref = as<Expr_ref>(callee)) {
+                    char const *name = ref->get_name()->get_name();
+                    if (!strcmp(name, "bsdf_marker")) {
+                        p.softbreak();
+                        p.string(" || node_props"); p.integer(node_index); p.string(".type_kind != IType::TK_BSDF");
+                    }
+                }
+            } else if (sema == mi::mdl::IDefinition::DS_INVALID_REF_CONSTRUCTOR) {
                 p.softbreak();
                 p.string(" || node_props"); p.integer(node_index); p.string(".type_kind != ");
                 switch (ret_type->get_kind()) {

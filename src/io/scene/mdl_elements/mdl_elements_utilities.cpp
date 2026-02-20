@@ -38,6 +38,7 @@
 #include "i_mdl_elements_function_call.h"
 #include "i_mdl_elements_function_definition.h"
 #include "i_mdl_elements_module.h"
+#include "i_mdl_elements_type.h"
 #include "mdl_elements_detail.h"
 #include "mdl_elements_type.h"
 
@@ -5650,6 +5651,11 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
     if( !value)
         return version;
 
+    mi::base::Handle<const IType> type( value->get_type());
+    mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, type.get());
+    if( v > version)
+        version = v;
+
     switch( value->get_kind()) {
 
         case IValue::VK_TEXTURE: {
@@ -5659,8 +5665,11 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
             if( tag && transaction->get_class_id( tag) == TEXTURE::ID_TEXTURE) {
                 DB::Access<TEXTURE::Texture> db_texture( tag, transaction);
                 std::string selector = db_texture->get_selector( transaction);
-                if( !selector.empty())
-                    version = mi::neuraylib::MDL_VERSION_1_7;
+                if( !selector.empty()) {
+                    mi::neuraylib::Mdl_version v = mi::neuraylib::MDL_VERSION_1_7;
+                    if( v > version)
+                        version = v;
+                }
             }
             break;
         }
@@ -5680,6 +5689,11 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
     if( !expr)
         return version;
 
+    mi::base::Handle<const IType> type( expr->get_type());
+    mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, type.get());
+    if( v > version)
+        version = v;
+
     switch( expr->get_kind()) {
 
         case IExpression::EK_CONSTANT: {
@@ -5687,7 +5701,9 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
                 expr->get_interface<IExpression_constant>());
             mi::base::Handle<const IValue> value(
                 constant->get_value());
-            version = get_min_required_mdl_version( transaction, value.get());
+            mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, value.get());
+            if( v > version)
+                version = v;
             break;
         }
 
@@ -5745,6 +5761,100 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
         }
     }
 
+    return version;
+}
+
+mi::neuraylib::Mdl_version get_min_required_mdl_version(
+    DB::Transaction* transaction, const IType* type)
+{
+    mi::neuraylib::Mdl_version version = mi::neuraylib::MDL_VERSION_1_0;
+    if( !type)
+        return version;
+
+    // argh, the right way to do it would eb to check the core type definition,
+    // but the module buildes is anyway BBR
+    switch( type->get_kind()) {
+        case IType::TK_ALIAS: {
+            mi::base::Handle<const IType_alias> alias_type(
+                type->get_interface<IType_alias>());
+            mi::base::Handle<const IType> aliased_type( alias_type->get_aliased_type());
+            mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, aliased_type.get());
+            if( v > version)
+                version = v;
+            break;
+        }
+        case IType::TK_BOOL:
+        case IType::TK_INT:
+            break;
+        case IType::TK_ENUM: {
+            mi::base::Handle<const IType_enum> enum_type(
+                type->get_interface<IType_enum>());
+            mi::neuraylib::Mdl_version v = mi::neuraylib::MDL_VERSION_1_0;
+            switch( enum_type->get_predefined_id()) {
+                case IType_enum::EID_TEX_GAMMA_MODE:
+                    break;
+                case IType_enum::EID_INTENSITY_MODE:
+                    v = mi::neuraylib::MDL_VERSION_1_1;
+                    break;
+                case IType_enum::EID_USER:
+                    break;
+            }
+            if( v > version)
+                version = v;
+            break;
+        }
+        case IType::TK_FLOAT:
+        case IType::TK_DOUBLE:
+        case IType::TK_STRING:
+        case IType::TK_VECTOR:
+        case IType::TK_MATRIX:
+        case IType::TK_COLOR:
+            break;
+        case IType::TK_ARRAY: {
+            mi::base::Handle<const IType_array> array_type(
+                type->get_interface<IType_array>());
+            mi::base::Handle<const IType> element_type( array_type->get_element_type());
+            mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, element_type.get());
+            if( v > version)
+                version = v;
+            break;
+        }
+        case IType::TK_STRUCT: {
+            mi::base::Handle<const IType_struct> struct_type(
+                type->get_interface<IType_struct>());
+            for( mi::Size i = 0, n = struct_type->get_size(); i < n; ++i) {
+                mi::base::Handle<const IType> field_type( struct_type->get_field_type( i));
+                mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, field_type.get());
+                if( v > version)
+                    version = v;
+            }
+            break;
+        }
+        case IType::TK_TEXTURE:
+        case IType::TK_LIGHT_PROFILE:
+        case IType::TK_BSDF_MEASUREMENT:
+        case IType::TK_BSDF:
+        case IType::TK_HAIR_BSDF:
+        case IType::TK_EDF:
+        case IType::TK_VDF:
+            break;
+    }
+    return version;
+}
+
+mi::neuraylib::Mdl_version get_min_required_mdl_version(
+    DB::Transaction* transaction, const IType_list* type_list)
+{
+    mi::neuraylib::Mdl_version version = mi::neuraylib::MDL_VERSION_1_0;
+    if( !type_list)
+        return version;
+
+    for( mi::Size i = 0, n = type_list->get_size(); i < n; ++i) {
+        mi::base::Handle<const IType> type( type_list->get_type( i));
+        mi::neuraylib::Mdl_version v = get_min_required_mdl_version( transaction, type.get());
+        if( v > version)
+            version = v;
+    }
     return version;
 }
 

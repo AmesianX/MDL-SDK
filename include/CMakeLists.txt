@@ -185,6 +185,7 @@ set(PROJECT_HEADERS_NEURAYLIB
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/ireader_writer_base.h"
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/iref.h"
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/iscene_element.h"
+    "${MDL_INCLUDE_FOLDER}/mi/neuraylib/ischeduling_configuration.h"
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/iscope.h"
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/ispectrum.h"
     "${MDL_INCLUDE_FOLDER}/mi/neuraylib/istream_position.h"

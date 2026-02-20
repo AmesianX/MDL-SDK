@@ -31,6 +31,8 @@
 #include "buffer.h"
 #include "shader.h"
 #include "descriptor_heap.h"
+#include <numeric>
+#include <execution>
 
 namespace mi { namespace examples { namespace mdl_d3d12
 {
@@ -66,10 +68,10 @@ Raytracing_pipeline::Hitgroup::Hitgroup(
 // ------------------------------------------------------------------------------------------------
 
 Raytracing_pipeline::Root_signature_association::Root_signature_association(
-    Root_signature* signature, bool owns_signature, const std::vector<std::string>& symbols)
+    const Root_signature* signature, bool owns_signature, const std::vector<std::string>& symbols)
     : m_root_signature(signature)
-    , m_owns_root_signature(owns_signature)
     , m_signature(signature->get_signature())
+    , m_owns_root_signature(owns_signature)
     , m_symbols(symbols.size())
     , m_symbol_pointers(symbols.size())
     , m_desc {}
@@ -84,11 +86,30 @@ Raytracing_pipeline::Root_signature_association::Root_signature_association(
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 
+Shader_collection::Shader_collection(Base_application* app, const Raytracing_pipeline* parent_pipeline, std::string debug_name)
+    : m_app(app)
+    , m_parent_pipeline(parent_pipeline)
+    , m_debug_name(debug_name)
+    , m_is_finalized(false)
+{
+}
+
+// ------------------------------------------------------------------------------------------------
+
+Shader_collection::~Shader_collection()
+{
+    for (auto&& asso : m_signature_associations)
+        if (asso.m_owns_root_signature)
+            delete asso.m_root_signature;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+
 Raytracing_pipeline::Raytracing_pipeline(Base_application* app, std::string debug_name)
     : m_app(app)
     , m_debug_name(debug_name)
     , m_is_finalized(false)
-    , m_dummy_local_root_signature(nullptr)
     , m_global_root_signature(new Root_signature(app, debug_name + "_GlobalRootSignature"))
 {
 }
@@ -97,22 +118,28 @@ Raytracing_pipeline::Raytracing_pipeline(Base_application* app, std::string debu
 
 Raytracing_pipeline::~Raytracing_pipeline()
 {
-    for (auto&& asso : m_signature_associations)
-        if (asso.m_owns_root_signature)
-            delete asso.m_root_signature;
+    if (m_global_root_signature)
+        delete m_global_root_signature;
 
-    // might not be initialized yet because of failure
-    if (m_dummy_local_root_signature != nullptr) delete m_dummy_local_root_signature;
-    delete m_global_root_signature;
+    for (size_t i = 0; i < m_collections.size(); i++)
+        delete m_collections[i];
+    m_collections.clear();
 }
 
 // ------------------------------------------------------------------------------------------------
 
-bool Raytracing_pipeline::add_library(const Shader_library& dxil_library)
+Shader_collection& Raytracing_pipeline::create_collection(const std::string& debug_name)
+{
+    m_collections.push_back(new Shader_collection(m_app, this, debug_name));
+    return *m_collections.back();
+}
+// ------------------------------------------------------------------------------------------------
+
+bool Shader_collection::add_library(const Shader_library& dxil_library)
 {
     if (m_is_finalized) {
         log_error("Pipeline '" + m_debug_name +
-                    "' is already finalized. No further changes possible.", SRC);
+            "' is already finalized. No further changes possible.", SRC);
         return false;
     }
 
@@ -120,7 +147,7 @@ bool Raytracing_pipeline::add_library(const Shader_library& dxil_library)
     for (auto&& libs : m_libraries)
         if (libs.get_dxil_library() == dxil_library.get_dxil_library()) {
             log_error("Tried to add DxIL library multiple times "
-                        "to pipeline:" + m_debug_name + ".", SRC);
+                "to pipeline:" + m_debug_name + ".", SRC);
             return false;
         }
 
@@ -134,7 +161,7 @@ bool Raytracing_pipeline::add_library(const Shader_library& dxil_library)
         if (m_all_exported_symbols.find(s) != m_all_exported_symbols.end())
         {
             log_error("Tried to add duplicated symbol '" + mi::examples::strings::wstr_to_str(s) +
-                        "' to pipeline:" + m_debug_name + ".", SRC);
+                "' to pipeline:" + m_debug_name + ".", SRC);
             return false;
         }
         m_all_exported_symbols.insert(s);
@@ -144,7 +171,7 @@ bool Raytracing_pipeline::add_library(const Shader_library& dxil_library)
 
 // ------------------------------------------------------------------------------------------------
 
-bool Raytracing_pipeline::add_hitgroup(
+bool Shader_collection::add_hitgroup(
     std::string name,
     std::string closest_hit_symbol,
     std::string any_hit_symbol,
@@ -153,7 +180,7 @@ bool Raytracing_pipeline::add_hitgroup(
     if (m_is_finalized)
     {
         log_error("Pipeline '" + m_debug_name +
-                    "' is already finalized. No further changes possible.", SRC);
+            "' is already finalized. No further changes possible.", SRC);
         return false;
     }
 
@@ -163,11 +190,11 @@ bool Raytracing_pipeline::add_hitgroup(
         if (group.m_name == wname)
         {
             log_error("Tried to add hit group '" + name + "' multiple times "
-                        "to pipeline:" + m_debug_name + ".", SRC);
+                "to pipeline:" + m_debug_name + ".", SRC);
             return false;
         }
 
-    Hitgroup group(name, closest_hit_symbol, any_hit_symbol, intersection_symbol);
+    Raytracing_pipeline::Hitgroup group(name, closest_hit_symbol, any_hit_symbol, intersection_symbol);
 
     // check that the symbols do exist
     std::vector<const std::wstring*> group_symbols;
@@ -181,9 +208,9 @@ bool Raytracing_pipeline::add_hitgroup(
         if (m_all_exported_symbols.find(*s) == m_all_exported_symbols.end())
         {
             log_error("Tried to add non existing symbol '" +
-                        mi::examples::strings::wstr_to_str(*s) +
-                        "' to hit-group '" + name +
-                        "' of pipeline:" + m_debug_name + ".", SRC);
+                mi::examples::strings::wstr_to_str(*s) +
+                "' to hit-group '" + name +
+                "' of pipeline:" + m_debug_name + ".", SRC);
             return false;
         }
 
@@ -193,7 +220,7 @@ bool Raytracing_pipeline::add_hitgroup(
 
 // ------------------------------------------------------------------------------------------------
 
-bool Raytracing_pipeline::add_signature_association(
+bool Shader_collection::add_signature_association(
     Root_signature* signature,
     bool owns_signature,
     const std::vector<std::string>& symbols)
@@ -201,11 +228,11 @@ bool Raytracing_pipeline::add_signature_association(
     if (m_is_finalized)
     {
         log_error("Pipeline '" + m_debug_name + "' is already finalized. "
-                    "No further changes possible.", SRC);
+            "No further changes possible.", SRC);
         return false;
     }
 
-    Root_signature_association asso(signature, owns_signature, symbols);
+    Raytracing_pipeline::Root_signature_association asso(signature, owns_signature, symbols);
 
     // make sure the symbol (or hit-group) to associate is available
     for (const auto& s : asso.m_symbols)
@@ -221,8 +248,8 @@ bool Raytracing_pipeline::add_signature_association(
 
         if (!found) {
             log_error("Tried to associate a symbol or hit group '" +
-                        mi::examples::strings::wstr_to_str(s) +
-                        " that is unknown to the pipeline:" + m_debug_name + ".", SRC);
+                mi::examples::strings::wstr_to_str(s) +
+                " that is unknown to the pipeline:" + m_debug_name + ".", SRC);
             return false;
         }
     }
@@ -241,29 +268,39 @@ bool Raytracing_pipeline::add_signature_association(
 
 // ------------------------------------------------------------------------------------------------
 
-bool Raytracing_pipeline::finalize()
+bool Shader_collection::finalize(std::vector<D3D12_STATE_SUBOBJECT>* pipeline_subobjects)
 {
     if (m_is_finalized)
     {
-        log_warning("Pipeline '" + m_debug_name + "' is already finalized. "
-                    "Finalizing again is a NO-OP.", SRC);
+        log_warning("Shader Collection '" + m_debug_name + "' is already finalized. "
+            "Finalizing again is a NO-OP.", SRC);
         return true;
     }
 
-    // The pipeline is made of a set of sub-objects, representing the DXIL libraries, hit group
-    // declarations, root signature associations, plus some configuration objects
-    UINT64 subobject_count =
+    const char* timing_name = pipeline_subobjects
+        ? "compile shader collection (disabled)"
+        : "compile shader collection";
+
+    Timing t(timing_name);
+    auto p = m_app->get_profiling().measure(timing_name);
+
+    // compute the number of elements because they reference eachother by pointer
+    // so we don't want resizing happening
+    UINT64 collection_subobject_count =
         m_libraries.size() +                    // DXIL libraries
-        m_hitgroups.size() +                    // Hit group declarations
-        1 +                                     // Shader configuration
-        1 +                                     // Shader payload
-        2 * m_signature_associations.size() +   // Root signature declaration + association
-        2 +                                     // Empty global and local root signatures
-        1;                                      // Final pipeline sub-object
+        m_hitgroups.size() +                    // hit group declarations
+        2 * m_signature_associations.size() +   // root signature declaration + association
+        1 +                                     // pipeline configuration
+        1 +                                     // shader configuration
+        1;                                      // global root signatures
 
-    std::vector<D3D12_STATE_SUBOBJECT> subobjects;
-    subobjects.reserve(subobject_count);
+    std::vector<D3D12_STATE_SUBOBJECT> collection_subobjects;
+    collection_subobjects.reserve(collection_subobject_count);
 
+    // using shader collections is way faster than compiling all libraries in one object
+    // if a pipeline_subobject list is passed, we fall back to this slower mode
+    std::vector<D3D12_STATE_SUBOBJECT>* subobjects = 
+        pipeline_subobjects ? pipeline_subobjects : &collection_subobjects;
 
     // Add all the DXIL libraries
     for (const auto& lib : m_libraries)
@@ -271,7 +308,7 @@ bool Raytracing_pipeline::finalize()
         D3D12_STATE_SUBOBJECT libSubobject = {};
         libSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
         libSubobject.pDesc = &lib.getData()->m_desc;
-        subobjects.push_back(std::move(libSubobject));
+        subobjects->push_back(std::move(libSubobject));
     }
 
     // Add all the hit group declarations
@@ -280,53 +317,11 @@ bool Raytracing_pipeline::finalize()
         D3D12_STATE_SUBOBJECT hitGroup = {};
         hitGroup.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
         hitGroup.pDesc = &group.m_desc;
-        subobjects.push_back(std::move(hitGroup));
+        subobjects->push_back(std::move(hitGroup));
 
         // Add hit group as exported symbol
         m_all_exported_symbols.insert(group.m_name);
     }
-
-    // Add a sub-object for the shader payload configuration
-    D3D12_RAYTRACING_SHADER_CONFIG shader_config_desc = {};
-    shader_config_desc.MaxPayloadSizeInBytes = static_cast<UINT>(m_max_payload_size_in_byte);
-    shader_config_desc.MaxAttributeSizeInBytes =
-        static_cast<UINT>(m_max_attribute_size_in_byte);
-
-    D3D12_STATE_SUBOBJECT shader_config = {};
-    shader_config.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-    shader_config.pDesc = &shader_config_desc;
-    subobjects.push_back(std::move(shader_config));
-
-    // Build a list of all the symbols for ray generation, miss and hit groups
-    // All those shader have to be associated with the payload definition
-    std::vector<LPCWSTR> exported_symbols;
-    for (const auto& name : m_all_exported_symbols)
-    {
-        if (m_all_associated_symbols.find(name) == m_all_associated_symbols.end()) {
-            log_error("Symbol or hit group '" + mi::examples::strings::wstr_to_str(name) +
-                        "' is missing a root signature association "
-                        "in pipeline:" + m_debug_name + ".", SRC);
-            return false;
-        }
-        exported_symbols.push_back(name.c_str());
-    }
-
-    // Add a sub-object for the association between shader and the payload
-    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION shader_payload_association_desc = {};
-    shader_payload_association_desc.NumExports = static_cast<UINT>(exported_symbols.size());
-    const WCHAR** exported_symbols_data = exported_symbols.data();
-    shader_payload_association_desc.pExports = exported_symbols_data;
-
-    // Associate the set of shader with the payload defined in the previous sub-object
-    shader_payload_association_desc.pSubobjectToAssociate = &subobjects[subobjects.size()-1];
-
-    // Create and store the payload association object
-    D3D12_STATE_SUBOBJECT shader_payload_association = {};
-    shader_payload_association.Type =
-        D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-    shader_payload_association.pDesc = &shader_payload_association_desc;
-    subobjects.push_back(std::move(shader_payload_association));
-
 
     // The root signature association requires two objects for each: one to declare the root
     // signature, and another to associate that root signature to a set of symbols
@@ -336,55 +331,198 @@ bool Raytracing_pipeline::finalize()
         D3D12_STATE_SUBOBJECT root_signature = {};
         root_signature.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
         root_signature.pDesc = &asso.m_signature;
-        subobjects.push_back(std::move(root_signature));
+        subobjects->push_back(std::move(root_signature));
 
         // Add a sub-object for the association between the exported shader symbols and the root
         // signature
         asso.m_desc.NumExports = static_cast<UINT>(asso.m_symbol_pointers.size());
         asso.m_desc.pExports = asso.m_symbol_pointers.data();
-        asso.m_desc.pSubobjectToAssociate = &subobjects[(subobjects.size() - 1)];
+        asso.m_desc.pSubobjectToAssociate = &subobjects->back();
 
         D3D12_STATE_SUBOBJECT root_signature_association = {};
         root_signature_association.Type =
             D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
         root_signature_association.pDesc = &asso.m_desc;
-        subobjects.push_back(std::move(root_signature_association));
+        subobjects->push_back(std::move(root_signature_association));
     }
 
-    // Add global root signature
-    if (!m_global_root_signature->finalize()) return false;
-    D3D12_STATE_SUBOBJECT global_root_signature_desc;
-    global_root_signature_desc.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-    ID3D12RootSignature* global_signature = m_global_root_signature->get_signature();
-    global_root_signature_desc.pDesc = &global_signature;
-    subobjects.push_back(std::move(global_root_signature_desc));
-
-    // The pipeline construction always requires an empty local root signature
-    m_dummy_local_root_signature = new Root_signature(
-        m_app, m_debug_name + "_dummy_local_root_signature");
-    m_dummy_local_root_signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-    if (!m_dummy_local_root_signature->finalize()) return false;
-
-    D3D12_STATE_SUBOBJECT local_root_signature_desc;
-    local_root_signature_desc.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-    ID3D12RootSignature* local_signature = m_dummy_local_root_signature->get_signature();
-    local_root_signature_desc.pDesc = &local_signature;
-    subobjects.push_back(std::move(local_root_signature_desc));
+    // the other objects are only needed in shader collection mode
+    if (pipeline_subobjects)
+    {
+        log_verbose("Elements of shader collection added to pipeline:" + m_debug_name);
+        m_is_finalized = true;
+        return true;
+    }
 
     // Add a sub-object for the ray tracing pipeline configuration
     D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config_desc = {};
-    pipeline_config_desc.MaxTraceRecursionDepth = static_cast<UINT>(m_max_recursion_depth);
+    pipeline_config_desc.MaxTraceRecursionDepth = static_cast<UINT>(m_parent_pipeline->get_max_recursion_depth());
+    D3D12_STATE_SUBOBJECT pipeline_config = {};
+    pipeline_config.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+    pipeline_config.pDesc = &pipeline_config_desc;
+    subobjects->push_back(std::move(pipeline_config));
 
+    // Add a sub-object for the shader payload configuration
+    D3D12_RAYTRACING_SHADER_CONFIG shader_config_desc = {};
+    shader_config_desc.MaxPayloadSizeInBytes = static_cast<UINT>(m_parent_pipeline->get_max_payload_size());
+    shader_config_desc.MaxAttributeSizeInBytes = static_cast<UINT>(m_parent_pipeline->get_max_attribute_size());
+    D3D12_STATE_SUBOBJECT shader_config = {};
+    shader_config.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+    shader_config.pDesc = &shader_config_desc;
+    subobjects->push_back(std::move(shader_config));
+
+    // Add global root signature
+    D3D12_STATE_SUBOBJECT global_root_signature_desc;
+    global_root_signature_desc.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+    const ID3D12RootSignature* global_signature = m_parent_pipeline->get_global_root_signature()->get_signature();
+    global_root_signature_desc.pDesc = &global_signature;
+    subobjects->push_back(std::move(global_root_signature_desc));
+
+    // Create the shader collection object
+    D3D12_STATE_OBJECT_DESC collection_desc = {};
+    collection_desc.Type = D3D12_STATE_OBJECT_TYPE_COLLECTION;
+    collection_desc.pSubobjects = collection_subobjects.data();
+    if (collection_subobject_count != collection_subobjects.size())
+    {
+        log_error("Wrong number of subojects in shader collection: " + m_debug_name, SRC);
+        return false;
+    }
+    collection_desc.NumSubobjects = static_cast<UINT>(collection_subobjects.size());
+    if (log_on_failure( m_app->get_device()->CreateStateObject(
+        &collection_desc, IID_PPV_ARGS(&m_state_object)),
+        "Failed to create shader collection state object: " + m_debug_name, SRC))
+        return false;
+    set_debug_name(m_state_object.Get(), m_debug_name);
+    m_is_finalized = true;
+
+    log_verbose("Compiled shader collection successfully:" + m_debug_name);
+
+    return true;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+bool Raytracing_pipeline::finalize()
+{
+    if (m_is_finalized)
+    {
+        log_warning("Pipeline '" + m_debug_name + "' is already finalized. "
+                    "Finalizing again is a NO-OP.", SRC);
+        return true;
+    }
+
+    // no changes to the root signature allowed
+    if (!m_global_root_signature->finalize())
+        return false;
+
+    // The pipeline is made of a set of sub-objects, representing the DXIL libraries, hit group
+    // declarations, root signature associations, plus some configuration objects
+    UINT64 pipeline_subobject_count =
+        1 + // pipeline configuration
+        1;  // shader configuration
+
+    // using shader collections is way faster than compiling all libraries in one object
+    // for compile time performance profiling, it might be helpfull to test the slower mode as well
+    bool no_shader_collections = m_app->get_options()->no_shader_collections;
+
+    // depending on this setting suboject need to be added to collections, to the pipeline or to both
+    if (no_shader_collections)
+    {
+        // we will add libraries, hitgroups, and associations to the pipeline directly
+        for (const auto& c : m_collections)
+        {
+            pipeline_subobject_count += c->get_libraries().size();
+            pipeline_subobject_count += c->get_hitgroups().size();
+            pipeline_subobject_count += 2 * c->get_signature_associations().size();
+        }
+        // pipeline_subobject_count += 1;   // shader payload associciation
+        pipeline_subobject_count += 1;   // global root signatures
+    }
+    else
+    {
+        pipeline_subobject_count += m_collections.size();
+
+        // process all the shader collections in parallel
+        // each collection will take care of its libraries, hitgroups, and associations
+        std::vector<size_t> indexRange(m_collections.size());
+        std::iota(indexRange.begin(), indexRange.end(), 0);
+        std::for_each(std::execution::par, indexRange.begin(), indexRange.end(), [&](size_t index)
+            {
+                m_collections[index]->finalize();
+            });
+        // check that all collections are finalized successfully
+        for (const auto& c : m_collections)
+            if (!c->is_finialized())
+                return false;
+    }
+
+    std::vector<D3D12_STATE_SUBOBJECT> subobjects;
+    subobjects.reserve(pipeline_subobject_count);
+
+    // Add a sub-object for the ray tracing pipeline configuration
+    D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config_desc = {};
+    pipeline_config_desc.MaxTraceRecursionDepth = static_cast<UINT>(get_max_recursion_depth());
     D3D12_STATE_SUBOBJECT pipeline_config = {};
     pipeline_config.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
     pipeline_config.pDesc = &pipeline_config_desc;
     subobjects.push_back(std::move(pipeline_config));
+
+    // Add a sub-object for the shader payload configuration
+    D3D12_RAYTRACING_SHADER_CONFIG shader_config_desc = {};
+    shader_config_desc.MaxPayloadSizeInBytes = static_cast<UINT>(get_max_payload_size());
+    shader_config_desc.MaxAttributeSizeInBytes = static_cast<UINT>(get_max_attribute_size());
+    D3D12_STATE_SUBOBJECT shader_config = {};
+    shader_config.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+    shader_config.pDesc = &shader_config_desc;
+    subobjects.push_back(std::move(shader_config));
+
+    // IMPORTANT: collection_descs and global_signature must remain in scope until after 
+    // CreateStateObject is called because subobjects contains pointers to these elements
+    std::vector<D3D12_EXISTING_COLLECTION_DESC> collection_descs;   // only used in no_shader_collections = false
+    const ID3D12RootSignature* global_signature = nullptr;          // only used in no_shader_collections = true
+
+    if (no_shader_collections)
+    {
+        // add the libraries, hitgroups, and associations of each collection
+        bool collections_added = true;
+        for (const auto& c : m_collections)
+            collections_added &= c->finalize(&subobjects);
+        if (!collections_added)
+            return false;
+
+        // Add global root signature, which is otherwise added to the collections as well
+        D3D12_STATE_SUBOBJECT global_root_signature_desc;
+        global_root_signature_desc.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+        global_signature = get_global_root_signature()->get_signature();
+        global_root_signature_desc.pDesc = &global_signature;
+        subobjects.push_back(std::move(global_root_signature_desc));
+    }
+    else
+    {
+        // add all pre-compiled collections
+        collection_descs.reserve(m_collections.size());
+        for (const auto& c : m_collections)
+        {
+            collection_descs.push_back({});
+            D3D12_EXISTING_COLLECTION_DESC& collection_desc = collection_descs.back();
+            collection_desc.pExistingCollection = c->get_state();
+            D3D12_STATE_SUBOBJECT libSubobject = {};
+            libSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION;
+            libSubobject.pDesc = &collection_desc;
+            subobjects.push_back(std::move(libSubobject));
+        }
+    }
 
     // Describe the ray tracing pipeline state object
     D3D12_STATE_OBJECT_DESC pipeline_desc = {};
     pipeline_desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
     pipeline_desc.NumSubobjects = static_cast<UINT>(subobjects.size());
     pipeline_desc.pSubobjects = subobjects.data();
+    if (pipeline_subobject_count != subobjects.size())
+    {
+        log_error("Wrong number of subojects in pipeline: " + m_debug_name, SRC);
+        return false;
+    }
 
     // Create the state object
     if (log_on_failure(m_app->get_device()->CreateStateObject(

@@ -676,14 +676,32 @@ mi::Sint32 Target_code::execute_environment(
         tex_handler) ? 0 : -1;
 }
 
+// Returns the distribution kind of a callable function, if the distribution kind
+// is \c DK_BSDF or \c DK_HAIR_BSDF, otherwise \c DK_INVALID (e.g. invalid index or
+// a non-allowed distribution kind).
+Target_code::Distribution_kind Target_code::get_bsdf_or_hair_bsdf_kind(
+    mi::Size index,
+    bool allow_none) const
+{
+    if (index >= m_callable_function_infos.size()) return DK_INVALID;
+
+    Distribution_kind dk = m_callable_function_infos[index].m_dist_kind;
+    if (dk == DK_BSDF || dk == DK_HAIR_BSDF || (allow_none && dk == DK_NONE)) {
+        return dk;
+    }
+    return DK_INVALID;
+}
+
 mi::Sint32 Target_code::execute_bsdf_init(
     mi::Size index,
     mi::neuraylib::Shading_state_material& state,
     mi::neuraylib::Texture_handler_base* tex_handler,
     const mi::neuraylib::ITarget_argument_block *cap_args) const
 {
-    return execute_df_init_function(mi::neuraylib::ITarget_code::DK_BSDF,
-        index, state, tex_handler, cap_args);
+    Distribution_kind dk = get_bsdf_or_hair_bsdf_kind(index, true);  // init also allows DK_NONE
+    if (dk == DK_INVALID) return -2;
+
+    return execute_df_init_function(dk, index, state, tex_handler, cap_args);
 }
 
 mi::Sint32 Target_code::execute_bsdf_sample(
@@ -693,7 +711,10 @@ mi::Sint32 Target_code::execute_bsdf_sample(
     mi::neuraylib::Texture_handler_base* tex_handler,
     const mi::neuraylib::ITarget_argument_block *cap_args) const
 {
-    return execute_generic_function(mi::neuraylib::ITarget_code::DK_BSDF,
+    Distribution_kind dk = get_bsdf_or_hair_bsdf_kind(index);
+    if (dk == DK_INVALID) return -2;
+
+    return execute_generic_function(dk,
         mi::neuraylib::ITarget_code::FK_DF_SAMPLE, index, data, state, tex_handler, cap_args);
 }
 
@@ -704,7 +725,10 @@ mi::Sint32 Target_code::execute_bsdf_evaluate(
     mi::neuraylib::Texture_handler_base* tex_handler,
     const mi::neuraylib::ITarget_argument_block *cap_args) const
 {
-    return execute_generic_function(mi::neuraylib::ITarget_code::DK_BSDF,
+    Distribution_kind dk = get_bsdf_or_hair_bsdf_kind(index);
+    if (dk == DK_INVALID) return -2;
+
+    return execute_generic_function(dk,
         mi::neuraylib::ITarget_code::FK_DF_EVALUATE, index, data, state, tex_handler, cap_args);
 }
 
@@ -715,7 +739,10 @@ mi::Sint32 Target_code::execute_bsdf_pdf(
     mi::neuraylib::Texture_handler_base* tex_handler,
     const mi::neuraylib::ITarget_argument_block *cap_args) const
 {
-    return execute_generic_function(mi::neuraylib::ITarget_code::DK_BSDF,
+    Distribution_kind dk = get_bsdf_or_hair_bsdf_kind(index);
+    if (dk == DK_INVALID) return -2;
+
+    return execute_generic_function(dk,
         mi::neuraylib::ITarget_code::FK_DF_PDF, index, data, state, tex_handler, cap_args);
 }
 
@@ -726,7 +753,10 @@ mi::Sint32 Target_code::execute_bsdf_auxiliary(
     mi::neuraylib::Texture_handler_base* tex_handler,
     const mi::neuraylib::ITarget_argument_block *cap_args) const
 {
-    return execute_generic_function(mi::neuraylib::ITarget_code::DK_BSDF,
+    Distribution_kind dk = get_bsdf_or_hair_bsdf_kind(index);
+    if (dk == DK_INVALID) return -2;
+
+    return execute_generic_function(dk,
         mi::neuraylib::ITarget_code::FK_DF_AUXILIARY, index, data, state, tex_handler, cap_args);
 }
 

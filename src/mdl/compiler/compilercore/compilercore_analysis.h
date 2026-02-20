@@ -36,6 +36,7 @@
 #include <mi/mdl/mdl_mdl.h>
 #include <mi/mdl/mdl_printers.h>
 #include <mi/mdl/mdl_declarations.h>
+#include <mi/mdl/mdl_entity_resolver.h>
 
 #include "compilercore_cc_conf.h"
 
@@ -46,9 +47,7 @@
 #include "compilercore_allocator.h"
 #include "compilercore_streams.h"
 #include "compilercore_def_table.h"
-#include "compilercore_errors.h"
 #include "compilercore_call_graph.h"
-#include "compilercore_stmt_info.h"
 #include "compilercore_stmt_info.h"
 #include "compilercore_tools.h"
 
@@ -767,6 +766,123 @@ private:
 
     Index_map  m_index_map;
     Import_vec m_imports;
+};
+
+/// A Cache for the entity resolver.
+class Entity_resolver_cache {
+public:
+    /// The key for a cache search.
+    class Key {
+    public:
+        /// Constructor.
+        ///
+        /// \param import_name   The module name to import.
+        /// \param owner_module  The owner MDL module that tries to resolve the import or NULL.
+        Key(
+            char const *import_name,
+            char const *owner_module)
+        : import_name(import_name)
+        , owner_module(owner_module)
+        {
+        }
+
+        /// Computes the hash value of this key.
+        size_t get_hash() const {
+            cstring_hash hasher;
+            size_t res = hasher(import_name);
+            res ^= owner_module == NULL ? 0xFEA10000 : hasher(owner_module);
+            return res;
+        }
+
+        /// Compare two keys for equality.
+        bool operator==(Key const &other) const {
+            if (strcmp(import_name, other.import_name) != 0) {
+                return false;
+            }
+            if (owner_module != NULL && other.owner_module != NULL) {
+                return strcmp(owner_module, owner_module) == 0;
+            }
+            return owner_module == other.owner_module;
+        }
+
+    private:
+        /// The module name to import.
+        char const *import_name;
+        /// The owner MDL module that tries to resolve the import or NULL.
+        char const *owner_module;
+    };
+
+    /// Constructor.
+    ///
+    /// \param alloc  allocator
+    Entity_resolver_cache(IAllocator *alloc)
+    : m_arena(alloc)
+    , m_cache(0, Cache::hasher(), Cache::key_equal(), alloc)
+    {
+    }
+
+    /// Find an import result by key.
+    ///
+    /// \param key  the search key
+    IMDL_import_result *find(Key const &k)
+    {
+        Cache::iterator it(m_cache.find(k));
+        if (it != m_cache.end()) {
+            mi::base::Handle<IMDL_import_result> &res = it->second;
+
+            res->retain();
+            return res.get();
+        }
+        return NULL;
+    }
+
+    /// Find an import result by import name and owner module name.
+    ///
+    /// \param import_name   the name of the module to import
+    /// \param owner_module  if non-NULL, the owner module name
+    IMDL_import_result *find(
+        char const *import_name,
+        char const *owner_module)
+    {
+        return find(Key(import_name, owner_module));
+    }
+
+    /// Insert a result.
+    ///
+    /// \param import_name   the name of the module to import
+    /// \param owner_module  if non-NULL, the owner module name
+    /// \param res           the import result
+    void insert(
+        char const         *import_name,
+        char const         *owner_module,
+        IMDL_import_result *res)
+    {
+        Key k(Arena_strdup(m_arena, import_name), Arena_strdup(m_arena, owner_module));
+        m_cache[k] = mi::base::make_handle_dup(res);
+    }
+
+private:
+    /// A functor for comparing search keys.
+    struct equal_to {
+        bool operator()(Key const &x, Key const &y) const {
+            return x == y;
+        }
+    };
+
+    /// A functor for hashing search keys.
+    struct hash {
+        size_t operator()(Key const &k) const {
+            return k.get_hash();
+        }
+    };
+
+    typedef hash_map<Key, mi::base::Handle<IMDL_import_result>, hash, equal_to>::Type Cache;
+
+    /// The arena to allocate strings on.
+    Memory_arena m_arena;
+
+    /// The Cache itself.
+    Cache m_cache;
 };
 
 ///
@@ -2237,6 +2353,9 @@ private:
 
     /// Resource entries of the current module.
     Resource_table m_resource_entries;
+
+    /// The entity resolver cache.
+    Entity_resolver_cache m_resolver_cache;
 };
 
 struct Resource_table_key

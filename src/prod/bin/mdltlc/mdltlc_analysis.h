@@ -151,6 +151,13 @@ public:
                 || is<Type_edf>(ret_t)
                 || is<Type_hair_bsdf>(ret_t)
                 || is<Type_material>(ret_t)) {
+
+                // Special case for bsdf_marker(). Do not add to used function set.
+                char const *name = ref->get_name()->get_name();
+                if (!strcmp(name, "bsdf_marker")) {
+                    return;
+                }
+
                 m_used_vars.insert(ref->get_name());
             }
             if (Type_struct const *ts = as<Type_struct>(ret_t)) {

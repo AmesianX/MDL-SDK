@@ -44,7 +44,7 @@ namespace mi { namespace examples { namespace dxr
     public:
         explicit Example_dxr_options()
             : Base_options()
-            , initial_scene(mi::examples::mdl::find_shader_file(
+            , initial_scene(mi::examples::mdl::find_resource_file(
                 MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/gltf/sphere/sphere.gltf"))
             , point_light_enabled(false)
             , point_light_position{ 10.0f, 0.0f, 5.0f }
@@ -58,7 +58,7 @@ namespace mi { namespace examples { namespace dxr
             , exposure_compensation(0.0f)
             , material_overrides()
         {
-            hdr_environment = mi::examples::mdl::find_shader_file(
+            hdr_environment = mi::examples::mdl::find_resource_file(
                 MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/hdri/hdrihaven_teufelsberg_inner_2k.exr");
         }
 
@@ -207,6 +207,8 @@ namespace mi { namespace examples { namespace dxr
            "                          the log file. (default: <outputfile-basename>.log)\n"
 
         << "--enable_shader_cache     Enable shader caching to improve (second) loading times.\n"
+
+        << "--no_shader_collections   Disable multithreaded pipeline creation.\n"
 
         << "--error                   Set log level to 'error' (default is 'info').\n"
         << "--warning                 Set log level to 'warning' (default is 'info').\n"
@@ -593,6 +595,10 @@ namespace mi { namespace examples { namespace dxr
                 else if (wcscmp(opt, L"--enable_shader_cache") == 0)
                 {
                     options.enable_shader_cache = true;
+                }
+                else if (wcscmp(opt, L"--no_shader_collections") == 0)
+                {
+                    options.no_shader_collections = true;
                 }
                 else if (wcscmp(opt, L"--error") == 0)
                 {

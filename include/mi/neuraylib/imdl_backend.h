@@ -987,15 +987,17 @@ public:
     /// \param [out] rx         The resolution of the texture in x.
     /// \param [out] ry         The resolution of the texture in y.
     /// \param [out] rz         The resolution of the texture in z.
-    /// \param [out] pixel_type The type of the data elements.
+    /// \param [out] pixel_type The pixel type of the data elements. Possible values are
+    ///                         \c "Float32" and \c "Float32<3>". See \ref mi_neuray_types for a
+    ///                         list of pixel types in general.
     /// \return                 A pointer to the texture data, if the texture is a distribution
     ///                         function data texture, \c nullptr otherwise.
     virtual const Float32* get_texture_df_data(
         Size index,
-        Size &rx,
-        Size &ry,
-        Size &rz,
-        const char *&pixel_type) const = 0;
+        Size& rx,
+        Size& ry,
+        Size& rz,
+        const char*& pixel_type) const = 0;
 
     //@}
     /// \name Light profiles

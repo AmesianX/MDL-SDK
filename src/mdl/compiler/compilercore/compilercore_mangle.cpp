@@ -1572,6 +1572,17 @@ string DAG_mangler::mangle(
     return mangle(type, owner->is_builtins() ? NULL : owner->get_name());
 }
 
+// Mangle a built-in conversion operator.
+string DAG_mangler::mangle_conversion(IType const *dst, IType const *src)
+{
+    m_printer.print(dst);
+    m_printer.print('(');
+    m_printer.print(src);
+    m_printer.print(')');
+
+    return m_printer.get_line();
+}
+
 // Mangle a parameter type.
 void DAG_mangler::add_mangle_parameter_type(IType const *type)
 {

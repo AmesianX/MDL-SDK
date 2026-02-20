@@ -754,6 +754,14 @@ public:
     IValue const *convert(IValue_factory *factory, IType const *dst_tp) const MDL_FINAL {
         dst_tp = dst_tp->skip_type_alias();
         switch (dst_tp->get_kind()) {
+        case IType::TK_INT:
+            {
+                if (std::isnan(m_value) || std::isinf(m_value)) {
+                    // invalid operation: converting NaN or Inf to int
+                    return factory->create_bad();
+                }
+                return factory->create_int(int(m_value));
+            }
         case IType::TK_COLOR:
             return factory->create_rgb_color(this, this, this);
         case IType::TK_MATRIX:
@@ -921,28 +929,42 @@ public:
     /// Convert a double value.
     IValue const *convert(IValue_factory *factory, IType const *dst_tp) const MDL_FINAL {
         dst_tp = dst_tp->skip_type_alias();
-        if (dst_tp->get_kind() == IType::TK_MATRIX) {
-            // convert a double into a diagonal double matrix
-            IType_matrix const *x_type = cast<IType_matrix>(dst_tp);
-            IType_vector const *v_type = x_type->get_element_type();
-            IType_atomic const *a_type = v_type->get_element_type();
-
-            if (a_type == this->m_type) {
-                IValue const *zero = factory->create_double(0.0);
-
-                IValue const *column_vals[4];
-                size_t n_cols = x_type->get_columns();
-                size_t n_rows = v_type->get_size();
-
-                for (size_t col = 0; col < n_cols; ++col) {
-                    IValue const *row_vals[4];
-                    for (size_t row = 0; row < n_rows; ++row) {
-                        row_vals[row] = col == row ? this : zero;
-                    }
-                    column_vals[col] = factory->create_vector(v_type, row_vals, n_rows);
+        switch (dst_tp->get_kind()) {
+        case IType::TK_INT:
+            {
+                if (std::isnan(m_value) || std::isinf(m_value)) {
+                    // invalid operation: converting NaN or Inf to int
+                    return factory->create_bad();
                 }
-                return factory->create_matrix(x_type, column_vals, n_cols);
+                return factory->create_int(int(m_value));
             }
+        case IType::TK_MATRIX:
+            {
+                // convert a double into a diagonal double matrix
+                IType_matrix const *x_type = cast<IType_matrix>(dst_tp);
+                IType_vector const *v_type = x_type->get_element_type();
+                IType_atomic const *a_type = v_type->get_element_type();
+
+                if (a_type == this->m_type) {
+                    IValue const *zero = factory->create_double(0.0);
+
+                    IValue const *column_vals[4];
+                    size_t n_cols = x_type->get_columns();
+                    size_t n_rows = v_type->get_size();
+
+                    for (size_t col = 0; col < n_cols; ++col) {
+                        IValue const *row_vals[4];
+                        for (size_t row = 0; row < n_rows; ++row) {
+                            row_vals[row] = col == row ? this : zero;
+                        }
+                        column_vals[col] = factory->create_vector(v_type, row_vals, n_rows);
+                    }
+                    return factory->create_matrix(x_type, column_vals, n_cols);
+                }
+            }
+            break;
+        default:
+            break;
         }
         return Base::convert(factory, dst_tp);
     }

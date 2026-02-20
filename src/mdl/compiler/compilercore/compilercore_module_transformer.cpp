@@ -1025,6 +1025,12 @@ IQualified_name *Module_inliner::clone_name(IQualified_name const *qname)
     return res;
 }
 
+// Adapt the position file name if necessary.
+void Module_inliner::adapt_position_owner(IExpression *expr)
+{
+    // do nothing
+}
+
 // Generates a call to the cloned struct constructor from the values of the original struct.
 IExpression_call *Module_inliner::make_constructor(
     IValue_compound const   *vs_ori,

@@ -1001,11 +1001,20 @@ public:
     , m_src_version(m_dst_version)
     , m_param_expr(ana.get_allocator(), num_args)
     , m_auto_imports(ana.m_auto_imports)
+    , m_file2id_map(0, File2id_map::hasher(), File2id_map::key_equal(), ana.get_allocator())
     , m_need_tex_gamma(ana.m_need_tex_gamma)
     , m_maybe_promotions(true)
     {
         if (m_src != NULL) {
             m_src_version = m_src->get_mdl_version();
+
+            if (m_src != &m_dst) {
+                // fill the File2ID map
+                Messages_impl const &msgs = m_dst.access_messages_impl();
+                for (size_t i = 1, n = msgs.get_fname_count(); i < n; ++i) {
+                    m_file2id_map[msgs.get_fname(i)] = i;
+                }
+            }
         }
 
         // This is tricky: we obviously do not need promotions if we have defaults from
@@ -1297,6 +1306,38 @@ public:
         }
         // just clone it
         return m_dst.clone_expr(lit, /*modifier=*/NULL);
+    }
+
+    /// Get the file name ID for a given file name.
+    size_t get_filename_id(char const *fname)
+    {
+        File2id_map::iterator it = m_file2id_map.find(fname);
+        if (it != m_file2id_map.end()) {
+            return it->second;
+        }
+
+        Messages_impl &msgs = m_dst.access_messages_impl();
+        size_t id = msgs.register_fname(fname);
+        m_file2id_map[fname] = id;
+
+        return id;
+    }
+
+    /// Adapt the position file name if necessary.
+    ///
+    /// \param expr  the expression whose position must be adapted
+    void adapt_position_owner(IExpression *expr) MDL_FINAL
+    {
+        if (m_src != NULL && m_src != &m_dst) {
+            Position &pos = expr->access_position();
+            size_t orig_id = pos.get_filename_id();
+
+            Messages_impl const &orig_msgs = m_src->access_messages_impl();
+            char const *fname = orig_msgs.get_fname(orig_id);
+
+            size_t id = get_filename_id(fname);
+            pos.set_filename_id(id);
+        }
     }
 
     // Clone the given simple name.
@@ -1659,6 +1700,11 @@ private:
     /// The auto-import map.
     Auto_imports &m_auto_imports;
 
+    typedef ptr_hash_map<char const, size_t, cstring_hash, cstring_equal_to>::Type File2id_map;
+
+    /// Map of imported file names to Position file IDs.
+    File2id_map m_file2id_map;
+
     /// True, if tex::gamma_moe mus be imported
     bool &m_need_tex_gamma;
 
@@ -1752,6 +1798,14 @@ public:
         return m_mod.clone_name(qname, NULL);
     }
 
+    /// Adapt the position file name if necessary.
+    ///
+    /// \param expr  the expression whose position must be adapted
+    void adapt_position_owner(IExpression *expr) MDL_FINAL
+    {
+        // do nothing
+    }
+
 private:
     /// The module.
     Module &m_mod;
@@ -1787,7 +1841,7 @@ public:
 
     /// Lookup a module.
     IModule const *lookup(
-        char const *absname,
+        char const                  *absname,
         IModule_cache_lookup_handle *cache_lookup_handle) const MDL_FINAL
     {
         bool direct;
@@ -2262,6 +2316,12 @@ void Analysis::Const_fold_expression::exception(
     case IConst_fold_handler::ER_INT_DIVISION_BY_ZERO:
         m_ana.error(
             DIVISION_BY_ZERO_IN_CONSTANT_EXPR,
+            expr->access_position(),
+            Error_params(m_ana));
+        return;
+    case IConst_fold_handler::ER_INVALID_FLOAT_OPERATION:
+        m_ana.error(
+            INVALID_FLOAT_OPERATION_IN_CONSTANT_EXPR,
             expr->access_position(),
             Error_params(m_ana));
         return;
@@ -3216,6 +3276,7 @@ NT_analysis::NT_analysis(
 , m_initializers_must_be_fixed(module.get_allocator())
 , m_sema_version_pos(NULL)
 , m_resource_entries(Resource_table::key_compare(), module.get_allocator())
+, m_resolver_cache(module.get_allocator())
 {
 }
 
@@ -3572,7 +3633,7 @@ restart:
 namespace {
 
 /// Helper class to handle the renaming of struct fields to constructor arguments.
-class Parameter_modifier : public IClone_modifier {
+class Parameter_modifier MDL_FINAL : public IClone_modifier {
     typedef ptr_hash_map<IDefinition const, Definition *>::Type Param_map;
 public:
     IExpression_reference *clone_expr_reference(
@@ -3625,6 +3686,14 @@ public:
     IQualified_name *clone_name(IQualified_name const *qname) MDL_FINAL
     {
         return m_module.clone_name(qname, NULL);
+    }
+
+    /// Adapt the position file name if necessary.
+    ///
+    /// \param expr  the expression whose position must be adapted
+    void adapt_position_owner(IExpression *expr) MDL_FINAL
+    {
+        // do nothing
     }
 
     /// Add a new mapping from a field definition to a parameter definition.
@@ -4107,46 +4176,55 @@ Module const *NT_analysis::load_module_to_import(
             m_ctx.get_front_path(),
             m_ctx.get_virtual_root_package());
 
-        // let the resolver find the absolute name
-        import_result = mi::base::make_handle(m_compiler->resolve_import(
-            resolver,
-            import_name.c_str(),
-            &m_module,
-            &rel_name->access_position(),
-            &m_ctx));
+        // check the import cache
+        import_result = m_resolver_cache.find(import_name.c_str(), m_module.get_name());
 
-        if (is_weak &&
-            !import_result.is_valid_interface() &&
-            messages.get_error_message_count() == 1)
-        {
-            if (is_weak_16) {
-                // copy the error message, which is otherwise lost
-                copy_resolver_messages_to_module(messages, /*is_resource=*/false);
-            }
-            // clear previous messages
-            messages.clear();
-
-            // resolving a formally weak reference failed, check if it is absolute
-            mi::base::Handle<IMDL_import_result> abs_result(m_compiler->resolve_import(
+        if (!import_result.is_valid_interface()) {
+            // let the resolver find the absolute name
+            import_result = mi::base::make_handle(m_compiler->resolve_import(
                 resolver,
-                import_name.c_str() + 1,
+                import_name.c_str(),
                 &m_module,
                 &rel_name->access_position(),
                 &m_ctx));
-            if (is_weak_16) {
-                if (abs_result.is_valid_interface()) {
-                    // .. and add a note
-                    add_note(
-                        POSSIBLE_ABSOLUTE_IMPORT,
-                        rel_name->access_position(),
-                        Error_params(*this).add(import_name.c_str() + 1));
-                } else {
-                    // do not generate a second error
-                    messages.clear();
+
+            if (is_weak &&
+                !import_result.is_valid_interface() &&
+                messages.get_error_message_count() == 1)
+            {
+                if (is_weak_16) {
+                    // copy the error message, which is otherwise lost
+                    copy_resolver_messages_to_module(messages, /*is_resource=*/false);
                 }
-            } else {
-                // prior 1.6, we allow weak imports to be resolved as absolute
-                import_result = abs_result;
+                // clear previous messages
+                messages.clear();
+
+                // resolving a formally weak reference failed, check if it is absolute
+                mi::base::Handle<IMDL_import_result> abs_result(m_compiler->resolve_import(
+                    resolver,
+                    import_name.c_str() + 1,
+                    &m_module,
+                    &rel_name->access_position(),
+                    &m_ctx));
+                if (is_weak_16) {
+                    if (abs_result.is_valid_interface()) {
+                        // .. and add a note
+                        add_note(
+                            POSSIBLE_ABSOLUTE_IMPORT,
+                            rel_name->access_position(),
+                            Error_params(*this).add(import_name.c_str() + 1));
+                    } else {
+                        // do not generate a second error
+                        messages.clear();
+                    }
+                } else {
+                    // prior 1.6, we allow weak imports to be resolved as absolute
+                    import_result = abs_result;
+                }
+            }
+
+            if (import_result.is_valid_interface()) {
+                m_resolver_cache.insert(import_name.c_str(), m_module.get_name(), import_result.get());
             }
         }
 
@@ -9546,6 +9624,7 @@ NT_analysis::Definition_list NT_analysis::resolve_overload(
                         // import its type
                         arg_type = def_expr->get_type();
                         arg_type = m_module.import_type(arg_type->skip_type_alias());
+                        // FIXME: this is wrong if def_expr originated from another module
                         def_pos  = &def_expr->access_position();
                     }
                 } else {

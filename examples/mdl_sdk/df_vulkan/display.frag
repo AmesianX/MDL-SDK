@@ -33,10 +33,12 @@
 layout(location = 0) out vec4 FragColor;
 
 layout(rgba32f, set = 0, binding = 0) uniform readonly restrict image2D uBeautyBuffer;
+#ifdef ENABLE_AUXILIARY
 layout(rgba32f, set = 0, binding = 1) uniform readonly restrict image2D uAuxAlbedoDiffuseBuffer;
 layout(rgba32f, set = 0, binding = 2) uniform readonly restrict image2D uAuxAlbedoGlossyBuffer;
 layout(rgba32f, set = 0, binding = 3) uniform readonly restrict image2D uAuxNormalBuffer;
 layout(rgba32f, set = 0, binding = 4) uniform readonly restrict image2D uAuxRoughnessBuffer;
+#endif
 
 layout(push_constant) uniform UserData
 {
@@ -54,6 +56,7 @@ void main()
     vec3 color;
     switch (uBufferIndex)
     {
+#ifdef ENABLE_AUXILIARY
     case 1:
         color = imageLoad(uAuxAlbedoDiffuseBuffer, uv).xyz + imageLoad(uAuxAlbedoGlossyBuffer, uv).xyz;
         break;
@@ -75,6 +78,7 @@ void main()
     case 5:
         color = imageLoad(uAuxRoughnessBuffer, uv).xyz;
         break;
+#endif
 
     default:
         color = imageLoad(uBeautyBuffer, uv).xyz;

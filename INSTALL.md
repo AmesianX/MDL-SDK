@@ -28,7 +28,7 @@ might work as well.
 <a name="thirdparty-dependencies-libs"></a>
 The following third-party libraries and tools are required to build the MDL SDK:
 
--   <a name="vcpkg">**vcpkg**</a> *(git commit ID 30d7c16)*  
+-   <a name="vcpkg">**vcpkg**</a> *(git commit ID 5fac54d)*  
     [Vcpkg](https://vcpkg.io/en/getting-started.html) is the recommended way to
     install other dependencies like Boost, OpenImageIO, GLEW, GLFW, and Vulkan.
     The vcpkg version mentioned above corresponds to the versions mentioned for
@@ -42,7 +42,7 @@ The following third-party libraries and tools are required to build the MDL SDK:
     for further details. Add the vcpkg option *--triplet=x64-windows-static* to
     the *install* command. There is no need to run the *integrate* command.
 
--   **Boost** *(1.89.0)*  
+-   **Boost** *(1.90.0)*  
     Installation via [vcpkg](#vcpkg) is strongly recommended. Install the vcpkg
     packages *boost-algorithm*, *boost-core*, *boost-dynamic-bitset*,
     *boost-functional*, *boost-intrusive*, *boost-tokenizer*, and
@@ -129,7 +129,7 @@ of examples is of no interest to you.
     Please follow the instructions on the
     [CUDA Developer Website](https://developer.nvidia.com/cuda-toolkit).
 
--   **Vulkan SDK** *(1.4.309.0)*  
+-   **Vulkan SDK** *(1.4.328.0)*  
     Building the Vulkan examples requires the Vulkan headers and validation layers,
     volk, and glslang.  
     Installation via [vcpkg](#vcpkg) is strongly recommended. Install the vcpkg

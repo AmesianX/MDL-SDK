@@ -77,6 +77,11 @@ public:
     ///
     /// \param name  the name to clone
     virtual IQualified_name *clone_name(IQualified_name const *qname) = 0;
+
+    /// Adapt the position file name if necessary.
+    ///
+    /// \param expr  the expression whose position must be adapted
+    virtual void adapt_position_owner(IExpression *expr) = 0;
 };
 
 /// Implementation of the semantic version.

@@ -1344,14 +1344,14 @@ function(ADD_TARGET_INSTALL)
     # TODO: Do not misuse the DESTINATION as distinction for that.
     if(ADD_TARGET_INSTALL_DESTINATION)
         foreach(_INCLUDE ${ADD_TARGET_INSTALL_INCLUDE})
-            list(APPEND _TMP PATTERN "${_INCLUDE}")
+            list(APPEND _PATTERNS PATTERN "${_INCLUDE}")
         endforeach()
         install(
             DIRECTORY $<TARGET_FILE_DIR:${ADD_TARGET_INSTALL_TARGET}>/
             DESTINATION ${ADD_TARGET_INSTALL_DESTINATION}
             USE_SOURCE_PERMISSIONS
             FILES_MATCHING
-            PATTERN ${_TMP}
+            ${_PATTERNS}
         )
         # Install the target file itself via a separate call using TARGETS in order to support
         # RPATH changes.

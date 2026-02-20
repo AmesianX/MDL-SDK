@@ -241,6 +241,10 @@ public:
     void dump() const;
 
 private:
+    /// Returns the value of the \c "force_default_gamma" export option, or \c false in case of
+    /// errors.
+    bool do_force_default_gamma( const mi::IMap* export_options) const;
+
     /// Adjusts the gamma value of a canvas depending on export options.
     ///
     /// If requested in \p export_options, and the gamma value of the canvas is sufficiently

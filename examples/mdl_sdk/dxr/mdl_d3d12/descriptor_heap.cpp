@@ -242,7 +242,7 @@ void Descriptor_heap::print_debug_infos()
 
         msg += "] " + e.resource_name;
     }
-    log_info(msg);
+    log_verbose(msg);
 }
 
 // --------------------------------------------------------------------------------------------

@@ -682,6 +682,8 @@ char const *get_error_template(
             return "weak relative imports of standard modules are not allowed in MDL $0.$1";
         case SELECT_FROM_NOT_IMPORTED_STRUCT:
             return "cannot select from not imported struct $0";
+        case INVALID_FLOAT_OPERATION_IN_CONSTANT_EXPR:
+            return "invalid float operation in constant expression";
 
         // ------------------------------------------------------------- //
         case EXTERNAL_APPLICATION_ERROR:

@@ -101,6 +101,7 @@
 #include <mi/neuraylib/ireader_writer_base.h>
 #include <mi/neuraylib/iref.h>
 #include <mi/neuraylib/iscene_element.h>
+#include <mi/neuraylib/ischeduling_configuration.h>
 #include <mi/neuraylib/iscope.h>
 #include <mi/neuraylib/ispectrum.h>
 #include <mi/neuraylib/istream_position.h>

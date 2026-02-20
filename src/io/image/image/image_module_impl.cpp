@@ -1070,7 +1070,8 @@ bool Image_module_impl::export_mipmap(
     const mi::Uint32 image_height  = canvas->get_resolution_y();
           mi::Uint32 nr_of_layers  = canvas->get_layers_size();
           mi::Uint32 nr_of_levels  = mipmap->get_nlevels();
-    const mi::Float32 gamma        = canvas->get_gamma();
+    const mi::Float32 gamma        = do_force_default_gamma( export_options)
+                                         ? export_default_gamma : canvas->get_gamma();
     const bool is_cubemap          = get_canvas_is_cubemap( canvas.get());
 
     mi::base::Handle<mi::neuraylib::IImage_file> image_file( plugin->open_for_writing(
@@ -1426,26 +1427,29 @@ void Image_module_impl::dump() const
     }
 }
 
-const mi::neuraylib::ICanvas* Image_module_impl::enforce_default_gamma(
-    const mi::neuraylib::ICanvas* canvas,
-    const mi::IMap* export_options,
-    mi::Float32 export_default_gamma) const
+bool Image_module_impl::do_force_default_gamma( const mi::IMap* export_options) const
 {
     const char* key = "force_default_gamma";
-    if( !export_options || !export_options->has_key( key)) {
-        canvas->retain();
-        return canvas;
-    }
+    if( !export_options || !export_options->has_key( key))
+        return false;
 
     mi::base::Handle<const mi::IBoolean> force_default_gamma(
         export_options->get_value<mi::IBoolean>( key));
     if( !force_default_gamma) {
         LOG::mod_log->error(
             M_IMAGE, LOG::Mod_log::C_IO, "Invalid type for option \"%s\".", key);
-        return nullptr;
+        return false;
     }
 
-    bool force = force_default_gamma->get_value<bool>();
+    return force_default_gamma->get_value<bool>();
+}
+
+const mi::neuraylib::ICanvas* Image_module_impl::enforce_default_gamma(
+    const mi::neuraylib::ICanvas* canvas,
+    const mi::IMap* export_options,
+    mi::Float32 export_default_gamma) const
+{
+    bool force = do_force_default_gamma( export_options);
     if( !force) {
         canvas->retain();
         return canvas;

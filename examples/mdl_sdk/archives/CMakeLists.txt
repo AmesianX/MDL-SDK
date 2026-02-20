@@ -63,5 +63,5 @@ target_create_vs_user_settings(TARGET ${PROJECT_NAME})
 add_target_install(
     TARGET ${PROJECT_NAME}
     DESTINATION "examples/mdl_sdk/archives"
-    INCLUDE "*main.mdl"
+    INCLUDE "main.mdl"
     )

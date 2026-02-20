@@ -515,7 +515,7 @@ bool Example_dxr::load()
 
         // use the default texture if the environment does not exist
         if (!mi::examples::io::file_exists(env_path))
-            env_path = mi::examples::mdl::find_shader_file(
+            env_path = mi::examples::mdl::find_resource_file(
                 MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/hdri/hdrihaven_teufelsberg_inner_2k.exr");
 
         // load this environment
@@ -1128,6 +1128,8 @@ bool Example_dxr::update_rendering_pipeline()
 
         Shader_compiler compiler(this);
 
+        // ray gen program
+        Shader_collection& raygen_collection = pipeline->create_collection("RayGenProgramCollection");
         // compile ray gen programs
         std::vector<Shader_library> raygen_libraries = compiler.compile_shader_library(
             get_options(),
@@ -1135,60 +1137,39 @@ bool Example_dxr::update_rendering_pipeline()
             &defines, { "RayGenProgram" });
         // add ray gen programs to the pipeline
         for (const auto& it : raygen_libraries)
-            if (!pipeline->add_library(it))
+            if (!raygen_collection.add_library(it))
                 return after_cleanup();
 
+        // Create local root signatures for the individual programs/groups
+        Root_signature* signature = new Root_signature(this, "RayGenProgramSignature");
+        signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+        if (!signature->finalize()) return false;
+        if (!raygen_collection.add_signature_association(signature, true,
+            { "RayGenProgram" }))
+            return false;
+
         // compile miss programs
+        Shader_collection& miss_collection = pipeline->create_collection("MissProgramCollection");
         std::vector<Shader_library> miss_libraries = compiler.compile_shader_library(
             get_options(),
-            mi::examples::mdl::find_shader_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/miss_programs.hlsl"),
+            mi::examples::mdl::find_resource_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "content/miss_programs.hlsl"),
             nullptr, { "RadianceMissProgram", "ShadowMissProgram" });
         // add miss programs to the pipeline
         for (const auto& it : miss_libraries)
-            if (!pipeline->add_library(it))
+            if (!miss_collection.add_library(it))
                 return after_cleanup();
+
+        signature = new Root_signature(this, "MissProgramSignature");
+        signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+        if (!signature->finalize()) return false;
+        if (!miss_collection.add_signature_association(signature, true,
+            { "RadianceMissProgram", "ShadowMissProgram" }))
+            return false;
     }
 
     {
         Timing t("setting up ray tracing pipeline");
         auto p = get_profiling().measure("setting up ray tracing pipeline");
-
-        // add DXIL libraries compiled for each materials and create individual hit-groups
-        // for each material
-        if (!mat_library.visit_target_codes([&](Mdl_material_target* target)
-        {
-            // skip unused targets, which are waiting for clean-up
-            if (target->get_material_count() == 0)
-                return true;
-
-            const std::vector<Shader_library>& material_shaders =
-                target->get_dxil_compiled_libraries();
-
-            // add ray gen programs to the pipeline
-            for (const auto& it : material_shaders)
-                if (!pipeline->add_library(it))
-                    return false;
-
-            // Create and add hit groups to the pipeline.
-            // this one will handle the shading of objects with MDL materials
-            std::string target_code_id = "_" + target->get_shader_name_suffix();
-            if (!pipeline->add_hitgroup(
-                "MdlRadianceHitGroup" + target_code_id,
-                target->get_entrypoint_radiance_closest_hit_name(),
-                target->get_entrypoint_radiance_any_hit_name(),
-                ""))
-                return false;
-
-            // .. this one will deal with shadows cast by objects with MDL materials
-            if (!pipeline->add_hitgroup(
-                "MdlShadowHitGroup" + target_code_id,
-                "",
-                target->get_entrypoint_shadow_any_hit_name(),
-                ""))
-                return false;
-
-            return true; // continue visits
-        })) return after_cleanup();
 
         if (!options->features.HLSL_dynamic_resources)
         {
@@ -1219,33 +1200,46 @@ bool Example_dxr::update_rendering_pipeline()
         for (const auto& s : mdl_samplers)
             pipeline->get_global_root_signature()->register_static_sampler(s);
 
-        // Create local root signatures for the individual programs/groups
-        Root_signature* signature = new Root_signature(this, "RayGenProgramSignature");
-        signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-        if (!signature->finalize()) return false;
-        if (!pipeline->add_signature_association(signature, true,
-            {"RayGenProgram"}))
-            return false;
-
-        signature = new Root_signature(this, "MissProgramSignature");
-        signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-        if (!signature->finalize()) return false;
-        if (!pipeline->add_signature_association(signature, true,
-            {"RadianceMissProgram", "ShadowMissProgram"}))
-            return false;
-
         // associate the signatures with the hit groups
-        if (!mat_library.visit_materials([&](Mdl_material* mat)
+        // add DXIL libraries compiled for each materials and create individual hit-groups
+        // for each material
+        if (!mat_library.visit_target_codes([&](Mdl_material_target* target)
         {
-            if (!mat->get_target_code())
-            {
+            // skip unused targets, which are waiting for clean-up
+            if (target->get_material_count() == 0)
                 return true;
-            }
 
-            std::string target_code_id = "_" + mat->get_target_code()->get_shader_name_suffix();
+            // create a collection for each unique target code
+            std::string target_code_id = "_" + target->get_shader_name_suffix();
+            Shader_collection& material_collection = pipeline->create_collection("MaterialCollection" + target_code_id);
+
+            const std::vector<Shader_library>& material_shaders =
+                target->get_dxil_compiled_libraries();
+
+            // add ray gen programs to the pipeline
+            for (const auto& it : material_shaders)
+                if (!material_collection.add_library(it))
+                    return false;
+
+            // Create and add hit groups to the pipeline.
+            // this one will handle the shading of objects with MDL materials
+            if (!material_collection.add_hitgroup(
+                "MdlRadianceHitGroup" + target_code_id,
+                target->get_entrypoint_radiance_closest_hit_name(),
+                target->get_entrypoint_radiance_any_hit_name(),
+                ""))
+                return false;
+
+            // .. this one will deal with shadows cast by objects with MDL materials
+            if (!material_collection.add_hitgroup(
+                "MdlShadowHitGroup" + target_code_id,
+                "",
+                target->get_entrypoint_shadow_any_hit_name(),
+                ""))
+                return false;
 
             // Local root signatures for individual programs
-            signature = new Root_signature(this, "ClosestHitGroupSignature" + target_code_id);
+            Root_signature* signature = new Root_signature(this, "ClosestHitGroupSignature" + target_code_id);
             signature->add_flag(D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 
             // mesh data
@@ -1268,17 +1262,19 @@ bool Example_dxr::update_rendering_pipeline()
 
             if (!signature->finalize()) return false;
 
-            if (!pipeline->add_signature_association(signature, true,
+            if (!material_collection.add_signature_association(signature, true,
                 {"MdlRadianceHitGroup" + target_code_id,
                 "MdlRadianceAnyHitProgram" + target_code_id,
-                "MdlRadianceClosestHitProgram" + target_code_id})) return false;
+                "MdlRadianceClosestHitProgram" + target_code_id
+                })) return false;
 
             // since the shadow hit also needs access to the MDL material, at least the
             // 'geometry.cutout_opacity' expression, we simply use the same signature.
             // Without alpha blending or cutout support, an empty signature would be sufficient.
-            if (!pipeline->add_signature_association(signature, false /*owned by group above*/,
+            if (!material_collection.add_signature_association(signature, false /*owned by group above*/,
                 {"MdlShadowHitGroup" + target_code_id,
-                "MdlShadowAnyHitProgram" + target_code_id})) return false;
+                "MdlShadowAnyHitProgram" + target_code_id
+                })) return false;
 
             return true; // continue visits
         })) return after_cleanup();
@@ -1435,13 +1431,17 @@ bool Example_dxr::update_rendering_pipeline()
     }
 
     // upload the table to the GPU
+    log_info("Uploading and running command list for pipeline creation");
     binding_table->upload(command_list);
     m_environment->transition_to(command_list, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
     command_queue->execute_command_list(command_list);
 
     // wait until all tasks are finished
+    log_info("Waiting for pipeline creation to finish");
     command_queue->flush();
+    // wait until all tasks are finished before potentially disposing resources
+    flush_command_queues();
+    log_info("Pipeline creation done");
 
     // print debug info
     get_render_target_descriptor_heap()->print_debug_infos();

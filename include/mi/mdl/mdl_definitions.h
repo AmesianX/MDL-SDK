@@ -721,6 +721,7 @@ public:
     /// Exception reasons.
     enum Reason {
         ER_INT_DIVISION_BY_ZERO,    ///< Integer division by zero.
+        ER_INVALID_FLOAT_OPERATION, ///< Invalid float operation.
         ER_INDEX_OUT_OF_BOUND       ///< Index out of bounds.
     };
 

@@ -57,6 +57,7 @@ namespace neuraylib { class IVersion; }
 namespace MI {
 
 namespace DB { class Database; }
+namespace THREAD_POOL { class Thread_pool; }
 
 namespace NEURAY {
 
@@ -80,6 +81,8 @@ class Mdle_api_impl;
 class Plugin_api_impl;
 class Plugin_configuration_impl;
 class Receiving_logger;
+class Scheduling_configuration_impl;
+
 }
 
 namespace MDL {
@@ -169,9 +172,10 @@ private:
     NEURAY::Mdle_api_impl* m_mdle_api_impl;
     NEURAY::Plugin_api_impl* m_plugin_api_impl;
     NEURAY::Plugin_configuration_impl* m_plugin_configuration_impl;
+    NEURAY::Scheduling_configuration_impl* m_scheduling_configuration_impl;
 
     /// Status of the instance, see #get_status().
-    Status m_status;
+    Status m_status = PRE_STARTING;
 
     /// The type of the map that stores the registered API components
     using Api_components_map = std::map<mi::base::Uuid, mi::base::IInterface*>;
@@ -180,8 +184,10 @@ private:
     /// The lock for the map that stores the registered API components
     mutable mi::base::Lock m_api_components_lock;
 
+    /// The thread pool.
+    THREAD_POOL::Thread_pool* m_thread_pool = nullptr;
     /// The database.
-    DB::Database* m_database;
+    DB::Database* m_database = nullptr;
 };
 
 } // namespace MDL

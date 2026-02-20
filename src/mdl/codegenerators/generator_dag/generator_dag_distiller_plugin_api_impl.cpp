@@ -2484,11 +2484,12 @@ IMaterial_instance *Distiller_plugin_api_impl::apply_rules(
     Store<IRule_matcher *>         s_matcher(m_matcher, &matcher);
 
 #if MDL_DIST_PLUG_DEBUG
+    int this_thread_hash = int(std::hash<std::thread::id>{}(std::this_thread::get_id())) & 0xff;
     static std::atomic<unsigned> idx = 0;
     unsigned my_idx = idx++;
     {
         char buffer[64];
-        snprintf(buffer, sizeof(buffer), "_%04u_%04u_%s__2", std::this_thread::get_id(), my_idx, m_matcher->get_rule_set_name());
+        snprintf(buffer, sizeof(buffer), "_%03u_%02u_%s_0", this_thread_hash, my_idx, m_matcher->get_rule_set_name());
 #if MDL_DIST_PLUG_DEBUG_GRAPH
         inst->dump_instance_dag(buffer);
 #endif
@@ -2591,9 +2592,8 @@ IMaterial_instance *Distiller_plugin_api_impl::apply_rules(
 #if MDL_DIST_PLUG_DEBUG
     {
         char buffer[64];
-        snprintf(buffer, sizeof(buffer), "_%04u_%04u_%s_a2", std::this_thread::get_id(), my_idx, m_matcher->get_rule_set_name());
+        snprintf(buffer, sizeof(buffer), "_%03u_%02u_%s_a", this_thread_hash, my_idx, m_matcher->get_rule_set_name());
 #if MDL_DIST_PLUG_DEBUG_GRAPH
-
         curr->dump_instance_dag(buffer);
 #endif
 
@@ -2657,7 +2657,7 @@ IMaterial_instance *Distiller_plugin_api_impl::apply_rules(
 #if MDL_DIST_PLUG_DEBUG
     {
         char buffer[64];
-        snprintf(buffer, sizeof(buffer), "_%04u_%04u_%s_z2", std::this_thread::get_id(), my_idx++, m_matcher->get_rule_set_name());
+        snprintf(buffer, sizeof(buffer), "_%03u_%02u_%s_z", this_thread_hash, my_idx++, m_matcher->get_rule_set_name());
 #if MDL_DIST_PLUG_DEBUG_GRAPH
         curr->dump_instance_dag(buffer);
 #endif
@@ -3110,7 +3110,7 @@ void Distiller_plugin_api_impl::get_match_properties(
             mprops.arity = array->get_argument_count();
             mprops.arity = mprops.arity < 5 ? mprops.arity : 4;
         } else if (mprops.sema == IDefinition::DS_INTRINSIC_DF_TINT
-            || mprops.sema == IDefinition::DS_INTRINSIC_DF_DIRECTIONAL_FACTOR) 
+            || mprops.sema == IDefinition::DS_INTRINSIC_DF_DIRECTIONAL_FACTOR)
         {
             mprops.arity = c->get_argument_count();
         } else if (mprops.sema == (IDefinition::DS_OP_BASE + IExpression::OK_TERNARY)) {
@@ -3130,6 +3130,7 @@ void Distiller_plugin_api_impl::get_match_properties(
                 mprops.type_kind = IType::TK_VDF;
             }
         }
+        // TODO: Store distiller semantic for bsdf_marker() into mprops.sema
     }
     break;
     case DAG_node::EK_TEMPORARY:
@@ -3360,6 +3361,10 @@ int Distiller_plugin_api_impl::get_selector(DAG_node const *node) const {
                     c->get_name(),
                     "::nvidia::distilling_support::local_normal(float,float3)") == 0) {
                     selector = DS_DIST_LOCAL_NORMAL;
+                } else  if (strcmp(
+                    c->get_name(),
+                    "bsdf_marker(int,float,color,bsdf") == 0) {
+                    selector = DS_DIST_BSDF_MARKER;
                 }
             }
         }

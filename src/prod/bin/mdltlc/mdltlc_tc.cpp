@@ -767,7 +767,15 @@ Type *Compilation_unit::type_check_call(Expr *expr, Environment &env,
             }
         }
 
-        if (pattern_ctx == Pattern_context::PC_PATTERN && function_type->get_semantics() == mi::mdl::IDefinition::Semantics::DS_UNKNOWN) {
+        bool skip_check = false;
+        if (Expr_ref *ref = as<Expr_ref>(callee)) {
+            Symbol const *callee_name = ref->get_name();
+            if (strcmp(callee_name->get_name(), "bsdf_marker") == 0) {
+                skip_check = true;
+            }
+        }
+
+        if (!skip_check && (pattern_ctx == Pattern_context::PC_PATTERN && function_type->get_semantics() == mi::mdl::IDefinition::Semantics::DS_UNKNOWN)) {
             mi::mdl::string s(m_arena.get_allocator());
             s = "called reference in pattern must have an assigned semantics: ";
             {
@@ -775,7 +783,7 @@ Type *Compilation_unit::type_check_call(Expr *expr, Environment &env,
                 pp::Pretty_print p(m_arena, out);
                 callee->pp(p);
                 s += out.str().c_str();
-        }
+            }
             error(callee->get_location(), s.c_str());
         }
         return function_type->get_return_type();

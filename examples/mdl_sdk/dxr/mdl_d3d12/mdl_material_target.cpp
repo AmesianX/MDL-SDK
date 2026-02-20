@@ -172,7 +172,7 @@ mi::Uint32 Mdl_material_target::Resource_callback::get_resource_index(
     size_t mat_resource_index = m_material->register_resource(kind, dimension, name);
 
     // log these manually defined indices
-    log_info(
+    log_verbose(
         "target code: " + m_target->get_compiled_material_hash() +
         " - texture id: " + std::to_string(mat_resource_index) +
         " (material id: " + std::to_string(m_material->get_id()) + ")" +

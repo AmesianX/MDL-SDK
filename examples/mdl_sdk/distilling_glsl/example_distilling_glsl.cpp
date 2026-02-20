@@ -545,7 +545,7 @@ public:
 
         m_code = m_target_code->get_code();
 #ifdef REMAP_NOISE_FUNCTIONS
-        std::string noise_source = mi::examples::mdl::read_shader_file(
+        std::string noise_source = mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
         m_code += noise_source;
 #endif
@@ -1211,9 +1211,9 @@ public:
 
     Shader_program(const std::string& vertex_shader_file, const std::string& fragment_shader_file)
     {
-        std::string vertex_shader_source = mi::examples::mdl::read_shader_file(
+        std::string vertex_shader_source = mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, vertex_shader_file.c_str());
-        std::string fragment_shader_source = mi::examples::mdl::read_shader_file(
+        std::string fragment_shader_source = mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, fragment_shader_file.c_str());
         m_program = create_shader_program(vertex_shader_source, fragment_shader_source);
     }
@@ -1306,7 +1306,7 @@ public:
         // Get fragment code generated from MDL expressions
         std::string fragment_code = mdl_ue4->get_code();
         // Add main fragment shader
-        fragment_code += mi::examples::mdl::read_shader_file(
+        fragment_code += mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY,  "example_distilling_glsl.frag");
 
 #ifdef DUMP_GLSL
@@ -1316,7 +1316,7 @@ public:
         file.close();
 #endif
         // Compile and link shaders
-        std::string vertex_code = mi::examples::mdl::read_shader_file(
+        std::string vertex_code = mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, "example_distilling_glsl.vert");
         m_program = create_shader_program(vertex_code, fragment_code);
 

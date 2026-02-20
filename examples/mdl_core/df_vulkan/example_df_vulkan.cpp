@@ -998,7 +998,7 @@ void Df_vulkan_app::do_settings_and_stats_gui()
     ImGui::SetNextWindowSize(ImVec2(360, m_options.use_class_compilation ? 550.0f : 275.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowBgAlpha(0.4f);
     ImGui::Begin("Settings");
-    ImGui::PushItemWidth(-200);
+    ImGui::PushItemWidth(150);
 
     ImGui::Text("Display options:");
     ImGui::Separator();
@@ -1266,7 +1266,7 @@ void Df_vulkan_app::create_accumulation_images()
 VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
 {
     std::string df_glsl_source = m_target_code->get_src_code();
-    std::string path_trace_shader_source = read_shader_file(
+    std::string path_trace_shader_source = read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, "path_trace.comp");
 
     std::vector<std::string> defines;

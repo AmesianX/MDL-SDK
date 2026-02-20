@@ -865,6 +865,14 @@ private:
     /// Destructor.
     ~Target_code();
 
+    /// Returns the distribution kind of a callable function, if the distribution kind
+    /// is \c DK_BSDF or \c DK_HAIR_BSDF, otherwise \c DK_INVALID (e.g. invalid index or
+    /// a non-allowed distribution kind).
+    ///
+    /// \param index       The index of the callable function
+    /// \param allow_none  Also allow \c DK_NONE, needed for init functions
+    Distribution_kind get_bsdf_or_hair_bsdf_kind(mi::Size index, bool allow_none = false) const;
+
 private:
     /// If native code was generated, its interface.
     mutable mi::base::Handle<mi::mdl::IGenerated_code_lambda_function> m_native_code;

@@ -225,7 +225,7 @@ static GLuint create_shader_program(
 
     GLuint program = glCreateProgram();
 
-    std::string vertex_shader_source = mi::examples::mdl::read_shader_file(
+    std::string vertex_shader_source = mi::examples::mdl::read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, vertex_shader_filename);
     add_shader(GL_VERTEX_SHADER, vertex_shader_source, program);
 
@@ -233,13 +233,13 @@ static GLuint create_shader_program(
     sstr << (use_ssbo ? "#version 430 core\n" : "#version 330 core\n");
     sstr << "#define MAX_MATERIALS " << to_string(max_materials) << "\n";
     sstr << "#define MAX_TEXTURES "  << to_string(max_textures) << "\n";
-    sstr << mi::examples::mdl::read_shader_file(
+    sstr << mi::examples::mdl::read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, fragment_shader_filename);
     add_shader(GL_FRAGMENT_SHADER, sstr.str() , program);
 
     std::string code(target_code->get_code());
     if (remap_noise_functions) {
-        std::string noise_shader_source =  mi::examples::mdl::read_shader_file(
+        std::string noise_shader_source =  mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
         code.append(noise_shader_source);
     }

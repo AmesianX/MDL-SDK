@@ -1089,6 +1089,7 @@ mi::Sint32 Mdl_module_builder::add_struct_type(
     // upgrade MDL version if necessary (and possible)
     mi::neuraylib::Mdl_version version = get_min_required_mdl_version(
         m_transaction,
+        fields,
         field_defaults,
         field_annotations,
         annotations);

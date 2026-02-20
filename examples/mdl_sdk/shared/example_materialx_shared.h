@@ -53,6 +53,12 @@ public:
 class Mdl_generator
 {
 public:
+    /// Constructor.
+    ///
+    /// Pass MDL_EXAMPLE_RELATIVE_DIRECTORY as argument.
+    Mdl_generator(const std::string& mdl_example_relative_directory)
+      : m_mdl_example_relative_directory(mdl_example_relative_directory) { }
+
     /// If true, the MaterialX libraries in the binary folder of the application are
     /// added at the end of the generators search path list (default: true).
     void set_add_std_path(bool add_paths);
@@ -85,12 +91,13 @@ public:
         Mdl_generator_result& inout_result) const;
 
 private:
+    const std::string m_mdl_example_relative_directory;
     std::vector<std::string> m_mtlx_search_paths;
     bool m_add_mtlx_std_path = true;
     std::vector<std::string> m_mtlx_relative_library_paths;
     std::string m_mtlx_file;
     std::string m_mtlx_material_name;
-    mi::neuraylib::Mdl_version m_mdl_version = mi::neuraylib::MDL_VERSION_1_10;
+    mi::neuraylib::Mdl_version m_mdl_version = mi::neuraylib::MDL_VERSION_LATEST;
     bool m_materialxtest_mode = false;
 };
 

@@ -310,7 +310,28 @@ std::string add_missing_material_signature(
 
 // --------------------------------------------------------------------------------------------
 
-std::string find_shader_file(const char* relative_directory, const char* shader_filename)
+std::string find_resource_directory(const char* relative_directory, const char* resource_dirname)
+{
+    // Location for build/install targets (next to executable).
+    std::string executable_dirname = io::get_executable_folder();
+    std::string path = executable_dirname + "/" + resource_dirname;
+    if (io::directory_exists(path))
+        return io::normalize(path);
+
+    // Location for examples as tools in vcpkg.
+    std::string examples_root = mdl::get_examples_root();
+    if (examples_root == ".")
+        return {};
+    path = examples_root + "/" + relative_directory + "/" + resource_dirname;
+    if (io::directory_exists(path))
+        return io::normalize(path);
+
+    return {};
+}
+
+// --------------------------------------------------------------------------------------------
+
+std::string find_resource_file(const char* relative_directory, const char* shader_filename)
 {
     // Location for build/install targets (next to executable).
     std::string executable_dirname = io::get_executable_folder();
@@ -331,9 +352,9 @@ std::string find_shader_file(const char* relative_directory, const char* shader_
 
 // --------------------------------------------------------------------------------------------
 
-std::string read_shader_file(const char* relative_directory, const char* shader_filename)
+std::string read_resource_file(const char* relative_directory, const char* shader_filename)
 {
-    std::string filename = find_shader_file(relative_directory, shader_filename);
+    std::string filename = find_resource_file(relative_directory, shader_filename);
     if (filename.empty())
         return {};
 

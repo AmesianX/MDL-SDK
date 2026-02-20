@@ -166,7 +166,7 @@ VkShaderModule create_fragment_shader_module(
     main_source << "#version 450\n";
     main_source << "#define NUM_TEXTURES "
         << std::to_string(target_code->get_texture_count() - 1) << "\n";
-    main_source << mi::examples::mdl::read_shader_file(
+    main_source << mi::examples::mdl::read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, g_fragment_shader_filename);
 #ifdef DUMP_GLSL
     std::cout << "Dumping main GLSL code:\n\n" << main_source.str() << std::endl;
@@ -175,7 +175,7 @@ VkShaderModule create_fragment_shader_module(
     std::string generated_target_source(target_code->get_code());
     if (remap_noise_functions)
     {
-        std::string noise_source = mi::examples::mdl::read_shader_file(
+        std::string noise_source = mi::examples::mdl::read_resource_file(
             MDL_EXAMPLE_RELATIVE_DIRECTORY, "noise_no_lut.glsl");
         generated_target_source.append(noise_source);
     }
@@ -211,7 +211,7 @@ VkShaderModule create_fragment_shader_module(
 
 VkShaderModule create_vertex_shader_module(VkDevice device)
 {
-    std::string shader_source = mi::examples::mdl::read_shader_file(
+    std::string shader_source = mi::examples::mdl::read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, g_vertex_shader_filename);
 
     mi::examples::vk::Glsl_compiler glsl_compiler(

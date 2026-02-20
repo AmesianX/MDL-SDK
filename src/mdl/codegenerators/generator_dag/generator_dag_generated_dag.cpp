@@ -6262,6 +6262,10 @@ Generated_code_dag::Material_instance::Instantiate_helper::renumber_parameter(
         node = inline_parameters(node, inline_params);
     }
 
+    // changing the index of parameters will destroy the CSE value table,
+    // hence delete it in advance
+    m_node_factory.identify_clear();
+
     // do the renumbering
     m_params = 0;
     for (size_t i = 0; i < n_params; ++i) {

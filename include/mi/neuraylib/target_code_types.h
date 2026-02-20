@@ -319,7 +319,7 @@ struct Shading_state_material_impl
 /// The MDL material state structure.
 using Shading_state_material = Shading_state_material_impl<false>;
 
-/// The MDL material state structure with derivatives for the texture coordinates.
+/// The MDL material state structure with derivatives.
 using Shading_state_material_with_derivs = Shading_state_material_impl<true>;
 
 
@@ -570,7 +570,7 @@ struct Texture_handler_vtable_impl
         tct_uint                    bsdf_measurement_index,
         tct_float const             theta_phi[2]);      //!< theta in [0, pi/2] and phi in [-pi, pi]
 
-    /// Implementation of adapt_normal().
+    /// Implementation of \c adapt_normal().
     void (*m_adapt_normal)(
         tct_float                              result[3],
         Texture_handler_base const            *self_base,
@@ -671,6 +671,7 @@ struct Texture_handler_vtable_impl
         tct_uint                               scene_data_id,
         tct_float const                        default_value[16],
         tct_bool                               uniform_lookup);
+
     //
     // The following functions are only used in the derivative variant,
     // and can be \c nullptr in the non-derivative variant
@@ -834,7 +835,7 @@ struct Bsdf_evaluate_data : public Bsdf_evaluate_data_base
     tct_float3       k1;             ///< mutual input: outgoing direction
 
     tct_float3       k2;             ///< input: incoming direction
-    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                      ///<     DF_HANDLE_SLOTS handles, calling 'evaluate' multiple
                                      ///<     times
     tct_float3       bsdf_diffuse[static_cast<size_t>(N)]; ///< output: (diffuse part of the)
@@ -906,7 +907,7 @@ struct Bsdf_auxiliary_data : public Bsdf_auxiliary_data_base
     tct_float3       ior2;           ///< mutual input: IOR other side
     tct_float3       k1;             ///< mutual input: outgoing direction
 
-    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                      ///<     DF_HANDLE_SLOTS handles, calling 'auxiliary' multiple
                                      ///<     times
     tct_float3       albedo_diffuse[static_cast<size_t>(N)];///< output: (diffuse part of the)
@@ -927,10 +928,10 @@ struct Bsdf_auxiliary_data<DF_HSM_POINTER> : public Bsdf_auxiliary_data_base
     tct_float3       ior2;           ///< mutual input: IOR other side
     tct_float3       k1;             ///< mutual input: outgoing direction
 
-    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int          handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                      ///<     DF_HANDLE_SLOTS handles, calling 'auxiliary' multiple
                                      ///<     times
-    tct_int          handle_count;   ///< input: number of elements of 'albedo' and 'normal'
+    tct_int          handle_count;   ///< input: number of elements of 'albedo_*' and 'normal'
     tct_float3*      albedo_diffuse; ///< output: (diffuse part of the) albedo
     tct_float3*      albedo_glossy;  ///< output: (glossy part of the) albedo
     tct_float3*      normal;         ///< output: normal
@@ -1220,7 +1221,7 @@ template<Df_handle_slot_mode N>
 struct Edf_evaluate_data : public Edf_evaluate_data_base
 {
     tct_float3      k1;             ///< input: outgoing direction
-    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                     ///<     DF_HANDLE_SLOTS handles, calling 'evaluate' multiple
                                     ///<     times
     tct_float       cos;                            ///< output: dot(normal, k1)
@@ -1232,7 +1233,7 @@ template<>
 struct Edf_evaluate_data<DF_HSM_POINTER> : public Edf_evaluate_data_base
 {
     tct_float3      k1;             ///< input: outgoing direction
-    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                     ///<     DF_HANDLE_SLOTS handles, calling 'evaluate' multiple
                                     ///<     times
     tct_int         handle_count;   ///< input: number of elements of 'edf'
@@ -1264,7 +1265,7 @@ template<Df_handle_slot_mode N>
 struct Edf_auxiliary_data : public Edf_auxiliary_data_base
 {
     tct_float3      k1;             ///< input: outgoing direction
-    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                     ///<     DF_HANDLE_SLOTS handles, calling 'auxiliary' multiple
                                     ///<     times
 
@@ -1275,7 +1276,7 @@ template<>
 struct Edf_auxiliary_data<DF_HSM_POINTER> : public Edf_auxiliary_data_base
 {
     tct_float3      k1;             ///< input: outgoing direction
-    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more then
+    tct_int         handle_offset;  ///< input: handle offset to allow the evaluation of more than
                                     ///<     DF_HANDLE_SLOTS handles, calling 'auxiliary' multiple
                                     ///<     times
     tct_int         handle_count;   ///< input: number of elements of 'edf'
@@ -1413,6 +1414,7 @@ using Edf_pdf_function_with_derivs = void(
     Shading_state_material_with_derivs const  *state,
     Resource_data const                       *res_data,
     char const                                *arg_block_data);
+
 
 /// Signature of the auxiliary function for material distribution functions created via
 /// #mi::neuraylib::IMdl_backend::translate_material_df() and

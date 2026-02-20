@@ -90,7 +90,7 @@ The following third-party dependencies are used by several and/or major
 examples. Installation is strongly recommended unless the corresponding group
 of examples is of no interest to you.
 
--   <a name="vcpkg">**vcpkg**</a> *(git commit ID 30d7c16)*
+-   <a name="vcpkg">**vcpkg**</a> *(git commit ID 5fac54d)*
     [Vcpkg](https://vcpkg.io/en/getting-started.html) is the recommended way to
     install other dependencies like GLEW and GLFW. The
     vcpkg version mentioned above corresponds to the versions mentioned for
@@ -129,7 +129,7 @@ of examples is of no interest to you.
     Please follow the instructions on the 
     [CUDA Developer Website](https://developer.nvidia.com/cuda-toolkit).
 
--   **Vulkan SDK** *(1.4.309.0)* \n
+-   **Vulkan SDK** *(1.4.328.0)* \n
     Building the Vulkan examples requires the Vulkan headers and validation layers,
     volk, and glslang. \n
     Installation via [vcpkg](#vcpkg) is strongly recommended. Install the vcpkg

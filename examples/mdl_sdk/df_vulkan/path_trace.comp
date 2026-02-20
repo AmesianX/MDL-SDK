@@ -32,6 +32,7 @@
 //   LOCAL_SIZE_X : The local work group size in the x dimension
 //   LOCAL_SIZE_Y : The local work group size in the y dimension
 //   MAX_SSS_STEPS : The number of random walk steps in case of sub-surface scattering
+//   ENABLE_AUXILIARY : Indicates whether auxiliary buffers are supported
 //
 //   BINDING_RENDER_PARAMS             : Binding index for Render_params
 //   BINDING_ENV_MAP                   : Binding index for uEnvironmentMap
@@ -107,6 +108,7 @@ readonly restrict buffer Environment_sample_data_buffer
 layout(rgba32f, set = 0, binding = BINDING_BEAUTY_BUFFER)
 uniform restrict image2D uBeautyBuffer;
 
+#ifdef ENABLE_AUXILIARY
 layout(rgba32f, set = 0, binding = BINDING_AUX_ALBEDO_DIFFUSE_BUFFER)
 uniform restrict image2D uAuxAlbedoDiffuseBuffer;
 
@@ -118,20 +120,25 @@ uniform restrict image2D uAuxNormalBuffer;
 
 layout(rgba32f, set = 0, binding = BINDING_AUX_ROUGHNESS_BUFFER)
 uniform restrict image2D uAuxRoughnessBuffer;
+#endif
 
 struct Ray_state
 {
     vec3 contribution;
+#ifdef ENABLE_AUXILIARY
     vec3 aux_albedo_diffuse;
     vec3 aux_albedo_glossy;
     vec3 aux_normal;
     vec2 aux_roughness;
+#endif
     vec3 weight;
     vec3 origin;
     vec3 dir;
     float last_bsdf_pdf;
     uint flags;
+#ifdef ENABLE_AUXILIARY
     uint aux_num_samples;
+#endif
 };
 
 #define FLAG_NONE               0
@@ -671,6 +678,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
             ray_state.contribution += ray_state.weight * emission_intensity * edf_evaluate_data.edf;
         }
 
+#ifdef ENABLE_AUXILIARY
         // BSDF
         //
         // Output auxiliary data
@@ -693,6 +701,7 @@ void trace_path(inout Ray_state ray_state, inout uint seed)
             ray_state.aux_roughness += bsdf_aux_data.roughness.xy;
             ray_state.aux_num_samples++;
         }
+#endif
 
         // Sample lights
         if (bounce < uMaxPathLength - 1)
@@ -785,11 +794,13 @@ void main()
         return;
 
     vec3 contribution = vec3(0.0);
+#ifdef ENABLE_AUXILIARY
     vec3 aux_albedo_diffuse = vec3(0.0);
     vec3 aux_albedo_glossy = vec3(0.0);
     vec3 aux_normal = vec3(0.0);
     vec2 aux_roughness = vec2(0.0);
     uint aux_num_samples = 0;
+#endif
 
     for (uint iteration = 0; iteration < uSamplesPerIteration; iteration++)
     {
@@ -808,15 +819,18 @@ void main()
 
         Ray_state ray_state;
         ray_state.contribution = vec3(0.0);
+#ifdef ENABLE_AUXILIARY
         ray_state.aux_albedo_diffuse = vec3(0.0);
         ray_state.aux_albedo_glossy = vec3(0.0);
         ray_state.aux_normal = vec3(0.0);
         ray_state.aux_roughness = vec2(0.0);
+        ray_state.aux_num_samples = 0;
+#endif
         ray_state.weight = vec3(1.0);
         ray_state.origin = ray_origin;
         ray_state.dir = ray_dir;
         ray_state.last_bsdf_pdf = DIRAC;
-        ray_state.aux_num_samples = 0;
+        ray_state.flags = FLAG_NONE;
 
         if (dot(ray_origin, ray_origin) < 1.0)
             add_flag(ray_state.flags, FLAG_INSIDE);
@@ -833,32 +847,40 @@ void main()
         else
             contribution += ray_state.contribution;
 
+#ifdef ENABLE_AUXILIARY
         aux_albedo_diffuse += ray_state.aux_albedo_diffuse;
         aux_albedo_glossy += ray_state.aux_albedo_glossy;
         aux_normal += ray_state.aux_normal;
         aux_roughness += ray_state.aux_roughness;
         aux_num_samples += ray_state.aux_num_samples;
+#endif
     }
 
     contribution *= 1.0 / float(uSamplesPerIteration);
 
+#ifdef ENABLE_AUXILIARY
     const float aux_weight = 1.0 / max(1.0, float(aux_num_samples));
     aux_albedo_diffuse *= aux_weight;
     aux_albedo_glossy *= aux_weight;
     if (dot(aux_normal, aux_normal) > 0.0)
         aux_normal = normalize(aux_normal);
     aux_roughness *= aux_weight;
+#endif
 
     const ivec2 image_coord = ivec2(gl_GlobalInvocationID.xy);
 
     vec3 old_beauty = imageLoad(uBeautyBuffer, image_coord).xyz;
+#ifdef ENABLE_AUXILIARY
     vec3 old_aux_albedo_diffuse = imageLoad(uAuxAlbedoDiffuseBuffer, image_coord).xyz;
     vec3 old_aux_albedo_glossy = imageLoad(uAuxAlbedoGlossyBuffer, image_coord).xyz;
     vec3 old_aux_normal = imageLoad(uAuxNormalBuffer, image_coord).xyz;
     vec2 old_aux_roughness = imageLoad(uAuxRoughnessBuffer, image_coord).xy;
+#endif
 
-    float blend_weight = float(uSamplesPerIteration) / float(uProgressiveIteration + uSamplesPerIteration);
+    float blend_weight
+        = float(uSamplesPerIteration) / float(uProgressiveIteration + uSamplesPerIteration);
     vec3 new_beauty = mix(old_beauty, contribution, blend_weight);
+#ifdef ENABLE_AUXILIARY
     vec3 new_aux_albedo_diffuse = mix(old_aux_albedo_diffuse, aux_albedo_diffuse, blend_weight);
     vec3 new_aux_albedo_glossy = mix(old_aux_albedo_glossy, aux_albedo_glossy, blend_weight);
     vec3 new_aux_normal = mix(old_aux_normal, aux_normal, blend_weight);
@@ -867,10 +889,13 @@ void main()
     // Renormalize auxiliary normal
     if (dot(new_aux_normal, new_aux_normal) > 0.0)
         new_aux_normal = normalize(new_aux_normal);
+#endif
 
     imageStore(uBeautyBuffer, image_coord, vec4(new_beauty, 0.0));
+#ifdef ENABLE_AUXILIARY
     imageStore(uAuxAlbedoDiffuseBuffer, image_coord, vec4(new_aux_albedo_diffuse, 0.0));
     imageStore(uAuxAlbedoGlossyBuffer, image_coord, vec4(new_aux_albedo_glossy, 0.0));
     imageStore(uAuxNormalBuffer, image_coord, vec4(new_aux_normal, 0.0));
     imageStore(uAuxRoughnessBuffer, image_coord, vec4(new_aux_roughness, 0.0, 0.0));
+#endif
 }

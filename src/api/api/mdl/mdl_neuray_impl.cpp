@@ -40,9 +40,11 @@
 
 #include <base/system/main/access_module.h>
 #include <base/system/version/i_version.h>
+#include <base/hal/host/i_host.h>
 #include <base/lib/log/i_log_logger.h>
 #include <base/data/db/i_db_database.h>
 #include <base/data/dblight/i_dblight.h>
+#include <base/data/thread_pool/i_thread_pool_thread_pool.h>
 #include <mdl/integration/mdlnr/i_mdlnr.h>
 #include <io/image/image/i_image.h>
 #include <io/scene/mdl_elements/i_mdl_elements_utilities.h>
@@ -67,6 +69,7 @@
 #include "neuray_mdle_api_impl.h"
 #include "neuray_plugin_api_impl.h"
 #include "neuray_plugin_configuration_impl.h"
+#include "neuray_scheduling_configuration_impl.h"
 #include "neuray_version_impl.h"
 
 #include "mdl_mdl_compiler_impl.h"
@@ -90,8 +93,6 @@ void pull_in_required_modules();
 std::atomic_uint32_t Neuray_impl::s_instance_count = 0;
 
 Neuray_impl::Neuray_impl()
-  : m_status( PRE_STARTING),
-    m_database( nullptr)
 {
     pull_in_required_modules();
 
@@ -121,6 +122,7 @@ Neuray_impl::Neuray_impl()
     m_mdle_api_impl = new NEURAY::Mdle_api_impl( this);
     m_plugin_api_impl = new NEURAY::Plugin_api_impl( this);
     m_plugin_configuration_impl = new NEURAY::Plugin_configuration_impl( this);
+    m_scheduling_configuration_impl = new NEURAY::Scheduling_configuration_impl( m_status);
 
     // Register API components that are always available,
     // other API components are registered in start()
@@ -132,6 +134,8 @@ Neuray_impl::Neuray_impl()
     register_api_component<mi::neuraylib::IMdl_i18n_configuration>( m_mdl_i18n_configuration_impl);
     register_api_component<mi::neuraylib::IPlugin_api>( m_plugin_api_impl);
     register_api_component<mi::neuraylib::IPlugin_configuration>( m_plugin_configuration_impl);
+    register_api_component<mi::neuraylib::IScheduling_configuration>(
+        m_scheduling_configuration_impl);
     register_api_component<mi::neuraylib::IVersion>( m_version_impl.get());
 }
 
@@ -145,8 +149,9 @@ Neuray_impl::~Neuray_impl()
     // Unregister API components that are always available,
     // other API components are unregistered in shutdown()
     unregister_api_component<mi::neuraylib::IVersion>();
-    unregister_api_component<mi::neuraylib::IPlugin_api>();
+    unregister_api_component<mi::neuraylib::IScheduling_configuration>();
     unregister_api_component<mi::neuraylib::IPlugin_configuration>();
+    unregister_api_component<mi::neuraylib::IPlugin_api>();
     unregister_api_component<mi::neuraylib::IMdl_i18n_configuration>();
     unregister_api_component<mi::neuraylib::IMdl_configuration>();
     unregister_api_component<mi::neuraylib::IMdl_compiler>();
@@ -165,6 +170,7 @@ Neuray_impl::~Neuray_impl()
 
     // Be careful with the ordering
     [[maybe_unused]] mi::Uint32 ref_count = 0;
+    ref_count = m_scheduling_configuration_impl->release(); CHECK_RESULT;
     ref_count = m_plugin_configuration_impl->release();     CHECK_RESULT;
     ref_count = m_plugin_api_impl->release();               CHECK_RESULT;
     ref_count = m_mdl_archive_api_impl->release();          CHECK_RESULT;
@@ -223,8 +229,14 @@ mi::Sint32 Neuray_impl::start( bool blocking)
     m_status = STARTING;
     mi::Sint32 result = 0;
 
+    SYSTEM::Access_module<HOST::Host_module> host_module( false);
+    int number_of_cpus = host_module->get_number_of_cpus();
+    auto cpu_load_limit = static_cast<float>( number_of_cpus);
+    m_thread_pool = new THREAD_POOL::Thread_pool(
+        cpu_load_limit, /*gpu_load_limit*/ 0.0f, /*nr_of_worker_threads*/ 0);
+
     m_database = DBLIGHT::factory(
-        /*thread_pool*/ nullptr, /*deserialization_manager*/ nullptr, /*enable_journal*/ false);
+        m_thread_pool, /*deserialization_manager*/ nullptr, /*enable_journal*/ false);
     NEURAY::Class_registration::register_classes_part2( m_class_factory, m_database);
 
     SYSTEM::Access_module<SCENE::Scene_module> scene_module( false);
@@ -253,6 +265,8 @@ mi::Sint32 Neuray_impl::start( bool blocking)
     result = m_mdle_api_impl->start();               CHECK_RESULT;
     result = m_plugin_configuration_impl->start();   CHECK_RESULT;
     result = m_plugin_api_impl->start();             CHECK_RESULT;
+    result = m_scheduling_configuration_impl->start( m_thread_pool, /*scheduler*/ nullptr);
+                                                     CHECK_RESULT;
 #undef CHECK_RESULT
 
     register_api_component<mi::neuraylib::IDatabase>( m_database_impl);
@@ -303,28 +317,33 @@ mi::Sint32 Neuray_impl::shutdown( bool blocking)
     unregister_api_component<mi::neuraylib::IDatabase>();
 
     m_database->close();
+    m_database = nullptr;
 
 #define CHECK_RESULT  if( result ) { m_status = FAILURE; return result; }
 
     // Be careful with the ordering
     mi::Sint32 result = 0;
-    result = m_mdl_archive_api_impl->shutdown();        CHECK_RESULT;
-    result = m_mdl_backend_api_impl->shutdown();        CHECK_RESULT;
-    result = m_mdl_compatibility_api_impl->shutdown();  CHECK_RESULT;
-    result = m_mdl_configuration_impl->shutdown();      CHECK_RESULT;
-    result = m_mdl_discovery_api_impl->shutdown();      CHECK_RESULT;
-    result = m_mdl_distiller_api_impl->shutdown();      CHECK_RESULT;
-    result = m_mdl_evaluator_api_impl->shutdown();      CHECK_RESULT;
-    result = m_mdl_factory_impl->shutdown();            CHECK_RESULT;
-    result = m_mdl_i18n_configuration_impl->shutdown(); CHECK_RESULT;
-    result = m_mdl_impexp_api_impl->shutdown();         CHECK_RESULT;
-    result = m_mdle_api_impl->shutdown();               CHECK_RESULT;
-    result = m_mdl_compiler_impl->shutdown();           CHECK_RESULT;
-    result = m_image_api_impl->shutdown();              CHECK_RESULT;
-    result = m_database_impl->shutdown();               CHECK_RESULT;
-    result = m_plugin_api_impl->shutdown();             CHECK_RESULT;
-    result = m_plugin_configuration_impl->shutdown();   CHECK_RESULT;
+    result = m_mdl_archive_api_impl->shutdown();          CHECK_RESULT;
+    result = m_mdl_backend_api_impl->shutdown();          CHECK_RESULT;
+    result = m_mdl_compatibility_api_impl->shutdown();    CHECK_RESULT;
+    result = m_mdl_configuration_impl->shutdown();        CHECK_RESULT;
+    result = m_mdl_discovery_api_impl->shutdown();        CHECK_RESULT;
+    result = m_mdl_distiller_api_impl->shutdown();        CHECK_RESULT;
+    result = m_mdl_evaluator_api_impl->shutdown();        CHECK_RESULT;
+    result = m_mdl_factory_impl->shutdown();              CHECK_RESULT;
+    result = m_mdl_i18n_configuration_impl->shutdown();   CHECK_RESULT;
+    result = m_mdl_impexp_api_impl->shutdown();           CHECK_RESULT;
+    result = m_mdle_api_impl->shutdown();                 CHECK_RESULT;
+    result = m_mdl_compiler_impl->shutdown();             CHECK_RESULT;
+    result = m_image_api_impl->shutdown();                CHECK_RESULT;
+    result = m_database_impl->shutdown();                 CHECK_RESULT;
+    result = m_plugin_api_impl->shutdown();               CHECK_RESULT;
+    result = m_plugin_configuration_impl->shutdown();     CHECK_RESULT;
+    result = m_scheduling_configuration_impl->shutdown(); CHECK_RESULT;
 #undef CHECK_RESULT
+
+    delete m_thread_pool;
+    m_thread_pool = nullptr;
 
     // Reset MDL configuration to prepare for another start
     m_mdl_configuration_impl->reset();

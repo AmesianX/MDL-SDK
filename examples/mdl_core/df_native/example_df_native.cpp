@@ -1899,7 +1899,7 @@ bool update_parmater_editor_window(
         ImGuiCond_FirstUseEver);
     ImGui::Begin("Material parameters");
     ImGui::SetWindowFontScale(1.f);
-    ImGui::PushItemWidth(-200.f);
+    ImGui::PushItemWidth(150.f);
     if (options.use_class_compilation)
         ImGui::Text("CTRL + Click to manually enter numbers");
     else

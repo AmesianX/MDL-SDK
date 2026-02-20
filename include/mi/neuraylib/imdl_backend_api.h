@@ -106,15 +106,17 @@ public:
     /// \param [out] rx         The resolution of the texture in x.
     /// \param [out] ry         The resolution of the texture in y.
     /// \param [out] rz         The resolution of the texture in z.
-    /// \param [out] pixel_type The type of the data elements.
+    /// \param [out] pixel_type The pixel type of the data elements. Possible values are
+    ///                         \c "Float32" and \c "Float32<3>". See \ref mi_neuray_types for a
+    ///                         list of pixel types in general.
     /// \return                 A pointer to the texture data or \c nullptr, if \p kind does not
     ///                         correspond to a distribution function data texture.
     virtual const Float32* get_df_data_texture(
         Df_data_kind kind,
-        Size &rx,
-        Size &ry,
-        Size &rz,
-        const char *&pixel_type) const = 0;
+        Size& rx,
+        Size& ry,
+        Size& rz,
+        const char*& pixel_type) const = 0;
 };
 
 /**@}*/ // end group mi_neuray_mdl_misc

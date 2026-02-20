@@ -154,7 +154,8 @@ enum Distiller_extended_node_semantics {
     DS_DIST_VDF_CONDITIONAL_OPERATOR,                ///< ternary ?: operator on vdf type
     DS_DIST_BSDF_DIRECTIONAL_FACTOR = 0x10110,       ///< directional factor for BSDF
     DS_DIST_EDF_DIRECTIONAL_FACTOR,                  ///< directional factor for EDF
-    DS_DIST_LOCAL_NORMAL = 0x11000                   ///< local_normal
+    DS_DIST_LOCAL_NORMAL = 0x11000,                  ///< local_normal
+    DS_DIST_BSDF_MARKER                              ///< bsdf_marker
 };
 
 ///

@@ -251,8 +251,10 @@ bool Mdl_generator::generate(
     // add the libraries in the applications binary folder
     if (m_add_mtlx_std_path)
     {
-        mtlx_search_path.append(
-            mx::FilePath{ mi::examples::io::get_executable_folder() + "/materialx" });
+        std::string mdl_search_path_for_materialx_support
+            = mi::examples::mdl::find_resource_directory(
+                m_mdl_example_relative_directory.c_str(), "materialx");
+        mtlx_search_path.append(mx::FilePath{ mdl_search_path_for_materialx_support });
     }
 
     // add additional relative library paths
@@ -370,11 +372,10 @@ bool Mdl_generator::generate(
     // Clear user data on the generator.
     generator_context.clearUserData();
 
-    // Specify the MDL target version, for MaterialX 1.38.9 and later.
-#if ((MATERIALX_MAJOR_VERSION > 1) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION >= 9))
+#define MATERIALX_VERSION (10000*MATERIALX_MAJOR_VERSION + 100*MATERIALX_MINOR_VERSION + MATERIALX_BUILD_VERSION)
 
+    // Specify the MDL target version, for MaterialX 1.38.9 and later.
+#if MATERIALX_VERSION >= 13809
     mx::GenMdlOptionsPtr gen_mdl_options = std::make_shared<mx::GenMdlOptions>();
 
     if (m_mdl_version == mi::neuraylib::MDL_VERSION_1_6)
@@ -383,10 +384,14 @@ bool Mdl_generator::generate(
         gen_mdl_options->targetVersion = mx::GenMdlOptions::MdlVersion::MDL_1_7;
     else if (m_mdl_version == mi::neuraylib::MDL_VERSION_1_8)
         gen_mdl_options->targetVersion = mx::GenMdlOptions::MdlVersion::MDL_1_8;
+#if MATERIALX_VERSION >= 13902
     else if (m_mdl_version == mi::neuraylib::MDL_VERSION_1_9)
         gen_mdl_options->targetVersion = mx::GenMdlOptions::MdlVersion::MDL_1_9;
+#if MATERIALX_VERSION >= 13903
     else if (m_mdl_version == mi::neuraylib::MDL_VERSION_1_10)
         gen_mdl_options->targetVersion = mx::GenMdlOptions::MdlVersion::MDL_1_10;
+#endif // 13903
+#endif // 13902
     else if (m_mdl_version == mi::neuraylib::MDL_VERSION_LATEST)
         gen_mdl_options->targetVersion = mx::GenMdlOptions::MdlVersion::MDL_LATEST;
     else
@@ -394,7 +399,7 @@ bool Mdl_generator::generate(
             "Ignoring unexpected MDL version.", __FILE__, __LINE__);
 
     generator_context.pushUserData(mx::GenMdlOptions::GEN_CONTEXT_USER_DATA_KEY, gen_mdl_options);
-#endif
+#endif // 13809
 
     // Load source document.
     mx::DocumentPtr material_document = mx::createDocument();

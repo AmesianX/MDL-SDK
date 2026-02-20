@@ -761,6 +761,7 @@ private:
 };
 
 /// Set the index of an parameter.
+/// \note This invalidates the CSE value table of the DAG node factory
 void set_parameter_index(DAG_parameter *param, Uint32 param_idx);
 
 /// Skip DAG temporaries if necessary.

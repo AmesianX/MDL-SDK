@@ -166,7 +166,7 @@ inline std::string dirname(const std::string& path)
 /// Returns the complete text content of the file with the given filename as a string.
 std::string read_text_file(const std::string& filename);
 
-/// Finds the location of a shader file.
+/// Finds the location of a resource file.
 ///
 /// Considers the directory of the executable first, then the one indicated by
 /// \p relative_directory.
@@ -175,20 +175,20 @@ std::string read_text_file(const std::string& filename);
 /// next to the example, e.g., resource files.
 ///
 /// \param relative_directory   The location relative to the root directory of the examples.
-/// \param shader_filename      The name of the shader file.
+/// \param resource_filename    The name of the resource file.
 /// \return                     The found location, or the empty string in case of failure.
-std::string find_shader_file(
-    const char* relative_directory, const char* shader_filename);
+std::string find_resource_file(
+    const char* relative_directory, const char* resource_filename);
 
-/// Reads the contents of a shader file.
+/// Reads the contents of a resource file.
 ///
 /// Considers the directory of the executable first, then the one indicated by
 /// \p relative_directory.
 ///
 /// \param relative_directory   The location relative to the root directory of the examples.
-/// \param shader_filename      The name of the shader file.
+/// \param resource_filename    The name of the resource file.
 /// \return                     The found location, or the empty string in case of failure.
-std::string read_shader_file(const char* relative_directory, const char* shader_filename);
+std::string read_resource_file(const char* relative_directory, const char* resource_filename);
 
 /// Returns the root directory of the examples.
 ///

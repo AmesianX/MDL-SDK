@@ -144,7 +144,7 @@ std::string read_text_file(const std::string& filename)
     return string_stream.str();
 }
 
-std::string find_shader_file(const char* relative_directory, const char* shader_filename)
+std::string find_resource_file(const char* relative_directory, const char* shader_filename)
 {
     // Location for build/install targets (next to executable).
     std::string executable_dirname = get_executable_folder();
@@ -163,9 +163,9 @@ std::string find_shader_file(const char* relative_directory, const char* shader_
     return {};
 }
 
-std::string read_shader_file(const char* relative_directory, const char* shader_filename)
+std::string read_resource_file(const char* relative_directory, const char* shader_filename)
 {
-    std::string filename = find_shader_file(relative_directory, shader_filename);
+    std::string filename = find_resource_file(relative_directory, shader_filename);
     if (filename.empty())
         return {};
 

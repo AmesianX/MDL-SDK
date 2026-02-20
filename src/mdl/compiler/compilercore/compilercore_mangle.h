@@ -289,17 +289,23 @@ public:
     /// \param with_signature_suffix   indicates whether to include the signature suffix
     string mangle(IDefinition const *def, IModule const *owner, bool with_signature_suffix = true);
 
-    /// Mangle a struct type.
+    /// Mangle a struct or enum type.
     ///
     /// \param type         the type to mangle
     /// \param module_name  the absolute module name of this type
     string mangle(IType const *type, char const *module_name);
 
-    /// Mangle a struct type.
+    /// Mangle a struct or enum type.
     ///
     /// \param type         the type to mangle
     /// \param owner        the owner module of this type
     string mangle(IType const *type, IModule const *owner);
+
+    /// Mangle a built-in conversion operator.
+    ///
+    /// \param dst  the destination type
+    /// \param src  the source type
+    string mangle_conversion(IType const *dst, IType const *src);
 
     /// Mangle a parameter type.
     ///

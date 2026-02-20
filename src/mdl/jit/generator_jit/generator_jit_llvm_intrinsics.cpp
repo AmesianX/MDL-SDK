@@ -75,6 +75,12 @@
 #include <mdl/compiler/compilercore/compilercore_tools.h>
 #include <mdl/runtime/spectral/i_spectral.h>
 
+#ifdef _MSC_VER
+// declare microsoft stack probing function,
+// this is used to do the stack probing in the JIT compiled code Windows
+extern "C" { extern void __chkstk(void); }
+#endif
+
 namespace mi {
 namespace mdl {
 
@@ -3860,6 +3866,11 @@ void LLVM_code_generator::register_native_runtime_functions(Jitted_code *jitted_
 
     // not math, but also needed
     REG_CMATH(memset, vv_vvIIZZ);
+
+#ifdef _MSC_VER
+    // on MSVC we need to register the __chkstk function to do the stack probing
+    jitted_code->register_function("__chkstk", (void *)__chkstk);
+#endif
 
     // optional functions
 

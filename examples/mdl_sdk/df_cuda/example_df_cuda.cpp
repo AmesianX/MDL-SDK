@@ -1042,7 +1042,7 @@ static void render_scene(
     CUfunction  cuda_function;
     char const *ptx_name = options.enable_derivatives ?
         "example_df_cuda_derivatives.ptx" : "example_df_cuda.ptx";
-    std::string ptx_filename = mi::examples::mdl::find_shader_file(
+    std::string ptx_filename = mi::examples::mdl::find_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, ptx_name);
     CUmodule cuda_module = build_linked_kernel(
         target_codes, ptx_filename.c_str(), "render_scene_kernel", &cuda_function);
@@ -1435,7 +1435,7 @@ static void render_scene(
                     ImGuiCond_FirstUseEver);
                 ImGui::Begin("Settings");
                 ImGui::SetWindowFontScale(options.gui_scale);
-                ImGui::PushItemWidth(-200 * options.gui_scale);
+                ImGui::PushItemWidth(150 * options.gui_scale);
                 if (options.use_class_compilation)
                     ImGui::Text("CTRL + Click to manually enter numbers");
                 else

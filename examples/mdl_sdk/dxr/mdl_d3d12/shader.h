@@ -296,6 +296,7 @@ namespace mi { namespace examples { namespace mdl_d3d12
         ///
         /// \return         The signature used for setting up the pipeline or
         ///                 nullptr when called before finalize().
+        const ID3D12RootSignature* get_signature() const;
         ID3D12RootSignature* get_signature();
 
         /// Get the number of root signature entries,

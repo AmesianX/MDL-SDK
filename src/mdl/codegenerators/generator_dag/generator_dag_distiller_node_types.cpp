@@ -72,6 +72,9 @@ char const *Node_types::get_return_type(size_t i) const {
     if ( i == local_normal) {
         return "color";
     }
+    if (i == bsdf_marker) {
+        return "bsdf";
+    }
     return "UNKNOWN";
 }
 
@@ -1245,6 +1248,13 @@ Node_types::Node_types() {
           Node_param(  "float", "weight", "0.0"),
           Node_param( "float3", "normal", "::state::normal()"));
 
+    push(bsdf_marker, "bsdf_marker", "bsdf_marker",
+        mi::mdl::IDefinition::DS_UNKNOWN,
+        "mi::mdl::DS_DIST_BSDF_MARKER", 1,
+        Node_param("int", "tag", "0"),
+        Node_param("color", "wrapped_color", "color(0.0)"),
+        Node_param("float", "wrapped_float", "0.0"),
+        Node_param("bsdf", "wrapped_bsdf", "bsdf()"));
 
 }
 

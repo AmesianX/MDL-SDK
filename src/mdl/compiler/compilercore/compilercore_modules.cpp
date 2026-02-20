@@ -2021,13 +2021,16 @@ IExpression *Module::clone_expr(
         } else {
             IValue const *old_value = lit->get_value();
             IValue const *new_value = import_value(old_value);
-            return create_literal(new_value, &lit->access_position());
+            res = create_literal(new_value, /*pos=*/NULL);
         }
     } else {
         // no literal
         res->set_type(new_type);
     }
     copy_position(res, expr);
+    if (modifier != NULL) {
+        modifier->adapt_position_owner(res);
+    }
     return res;
 }
 

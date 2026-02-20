@@ -1084,7 +1084,7 @@ void addMDLMaterial(
 
                 // Create the closest hit program, if it hasn't already been created
                 if (state.radiance_hit_groups.empty()) {
-                    std::string ptx = mi::examples::mdl::read_shader_file(
+                    std::string ptx = mi::examples::mdl::read_resource_file(
                         MDL_EXAMPLE_RELATIVE_DIRECTORY,
                         "optix7_mdl_closest_hit_radiance_direct_call.ptx");
                     mat_hit_group = createRadianceClosestHitProgramGroup(
@@ -1187,7 +1187,7 @@ void initMDL(
         // In no-direct-call mode, register closest hit shader code and texture
         // runtime to be linked and optimized with the generated code
         state.mdl_helper->set_renderer_module(
-            mi::examples::mdl::find_shader_file(
+            mi::examples::mdl::find_resource_file(
                 MDL_EXAMPLE_RELATIVE_DIRECTORY, "optix7_mdl_closest_hit_radiance.bc"),
             /*visible_functions=*/ "__closesthit__radiance");
     }
@@ -1342,7 +1342,7 @@ void createProgramGroups(PathTracerState &state)
 {
     Timing timing("creating OptiX module and program groups");
 
-    std::string ptx = mi::examples::mdl::read_shader_file(
+    std::string ptx = mi::examples::mdl::read_resource_file(
         MDL_EXAMPLE_RELATIVE_DIRECTORY, "optix7_mdl.ptx");
 
     char   log[2048];

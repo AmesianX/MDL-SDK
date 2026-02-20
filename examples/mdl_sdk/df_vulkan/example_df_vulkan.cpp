@@ -95,6 +95,7 @@ struct Options
     bool background_color_enabled = false;
     mi::Float32_3 background_color = { 0.0f, 0.0f, 0.0f };
     bool use_class_compilation = true;
+    bool enable_auxiliary_output = true;
     uint32_t tex_results_cache_size = 16;
     bool enable_ro_segment = false;
     bool disable_ssbo = false;
@@ -1002,7 +1003,7 @@ void Df_vulkan_app::do_settings_and_stats_gui()
     ImGui::SetNextWindowSize(ImVec2(360, m_options.use_class_compilation ? 550.0f : 275.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowBgAlpha(0.4f);
     ImGui::Begin("Settings");
-    ImGui::PushItemWidth(-200);
+    ImGui::PushItemWidth(150);
 
     ImGui::Text("Display options:");
     ImGui::Separator();
@@ -1264,7 +1265,7 @@ VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
     std::string df_glsl_source = m_target_code->get_code();
 
     std::string path_trace_path
-        = mi::examples::mdl::find_shader_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "path_trace.comp");
+        = mi::examples::mdl::find_resource_file(MDL_EXAMPLE_RELATIVE_DIRECTORY, "path_trace.comp");
     if (path_trace_path.empty()) {
         std::cerr << "Failed to find shader file path_trace.comp" << std::endl;
         terminate();
@@ -1276,6 +1277,8 @@ VkShaderModule Df_vulkan_app::create_path_trace_shader_module()
     defines.push_back("LOCAL_SIZE_X=" + std::to_string(g_local_size_x));
     defines.push_back("LOCAL_SIZE_Y=" + std::to_string(g_local_size_y));
     defines.push_back("MAX_SSS_STEPS=" + std::to_string(m_options.max_sss_steps));
+    if (m_options.enable_auxiliary_output)
+        defines.push_back("ENABLE_AUXILIARY");
 
     defines.push_back("BINDING_RENDER_PARAMS=" + std::to_string(g_binding_render_params));
     defines.push_back("BINDING_ENV_MAP=" + std::to_string(g_binding_environment_map));
@@ -1362,10 +1365,13 @@ void Df_vulkan_app::create_descriptor_set_layouts()
         bindings.push_back(make_binding(g_binding_material_textures_2d, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, max_num_textures));
         bindings.push_back(make_binding(g_binding_material_textures_3d, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, max_num_textures));
         bindings.push_back(make_binding(g_binding_beauty_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
-        bindings.push_back(make_binding(g_binding_aux_albedo_diffuse_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
-        bindings.push_back(make_binding(g_binding_aux_albedo_glossy_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
-        bindings.push_back(make_binding(g_binding_aux_normal_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
-        bindings.push_back(make_binding(g_binding_aux_roughness_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
+        if (m_options.enable_auxiliary_output)
+        {
+            bindings.push_back(make_binding(g_binding_aux_albedo_diffuse_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
+            bindings.push_back(make_binding(g_binding_aux_albedo_glossy_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
+            bindings.push_back(make_binding(g_binding_aux_normal_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
+            bindings.push_back(make_binding(g_binding_aux_roughness_buffer, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1));
+        }
         bindings.push_back(make_binding(g_binding_ro_data_buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1));
         bindings.push_back(make_binding(g_binding_argument_block_buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1));
 
@@ -1466,12 +1472,16 @@ void Df_vulkan_app::create_pipelines()
     }
 
     { // Create display graphics pipeline
+        std::vector<std::string> defines;
+        if (m_options.enable_auxiliary_output)
+            defines.push_back("ENABLE_AUXILIARY");
+
         VkShaderModule fullscreen_triangle_vertex_shader
             = mi::examples::vk::create_shader_module_from_file(
-                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.vert", EShLangVertex, {}, m_options.enable_shader_optimization);
+                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.vert", EShLangVertex, defines, m_options.enable_shader_optimization);
         VkShaderModule display_fragment_shader
             = mi::examples::vk::create_shader_module_from_file(
-                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.frag", EShLangFragment, {}, m_options.enable_shader_optimization);
+                m_device, MDL_EXAMPLE_RELATIVE_DIRECTORY, "display.frag", EShLangFragment, defines, m_options.enable_shader_optimization);
 
         m_display_pipeline = mi::examples::vk::create_fullscreen_triangle_graphics_pipeline(
             m_device, m_display_pipeline_layout, fullscreen_triangle_vertex_shader,
@@ -1906,8 +1916,10 @@ void Df_vulkan_app::update_accumulation_image_descriptors()
 {
     std::vector<VkWriteDescriptorSet> descriptor_writes;
 
+    size_t accum_image_count = m_options.enable_auxiliary_output ? ACCUM_IMAGE_COUNT : 1;
+
     std::vector<VkDescriptorImageInfo> descriptor_image_infos;
-    descriptor_image_infos.reserve(m_image_count * ACCUM_IMAGE_COUNT + ACCUM_IMAGE_COUNT);
+    descriptor_image_infos.reserve(m_image_count * accum_image_count + accum_image_count);
 
     const uint32_t accum_image_bindings[] = {
         g_binding_beauty_buffer,
@@ -1928,7 +1940,7 @@ void Df_vulkan_app::update_accumulation_image_descriptors()
         descriptor_write.descriptorCount = 1;
         descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 
-        for (size_t j = 0; j < ACCUM_IMAGE_COUNT; j++)
+        for (size_t j = 0; j < accum_image_count; j++)
         {
             descriptor_image_info.imageView = m_accum_images[j].image_view;
             descriptor_image_infos.push_back(descriptor_image_info);
@@ -1949,7 +1961,7 @@ void Df_vulkan_app::update_accumulation_image_descriptors()
     descriptor_write.descriptorCount = 1;
     descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 
-    for (uint32_t i = 0; i < ACCUM_IMAGE_COUNT; i++)
+    for (uint32_t i = 0; i < accum_image_count; i++)
     {
         descriptor_info.imageView = m_accum_images[i].image_view;
         descriptor_image_infos.push_back(descriptor_info);
@@ -1981,8 +1993,10 @@ void Df_vulkan_app::write_accum_images_to_files()
     };
 
     uint32_t image_bpp = mi::examples::vk::get_image_format_bpp(g_accumulation_texture_format);
+
     std::vector<uint8_t> image_pixels[ACCUM_IMAGE_COUNT];
-    for (uint32_t i = 0; i < ACCUM_IMAGE_COUNT; i++)
+    size_t accum_image_count = m_options.enable_auxiliary_output ? ACCUM_IMAGE_COUNT : 1;
+    for (uint32_t i = 0; i < accum_image_count; i++)
     {
         image_pixels[i] = mi::examples::vk::copy_image_to_buffer(
             m_device, m_physical_device, m_command_pool, m_graphics_queue,
@@ -1990,12 +2004,16 @@ void Df_vulkan_app::write_accum_images_to_files()
             VK_IMAGE_LAYOUT_GENERAL, false);
     }
 
-    std::vector<uint8_t> albedo_pixels(m_image_width * m_image_height * image_bpp);
-    float* albedo_ptr = reinterpret_cast<float*>(albedo_pixels.data());
-    float* albedo_diffuse_ptr = reinterpret_cast<float*>(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_DIFFUSE].data());
-    float* albedo_glossy_ptr = reinterpret_cast<float*>(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_GLOSSY].data());
-    for (size_t i = 0; i < albedo_pixels.size() / sizeof(float); i++)
-        albedo_ptr[i] = albedo_diffuse_ptr[i] + albedo_glossy_ptr[i];
+    std::vector<uint8_t> albedo_pixels;
+    if (m_options.enable_auxiliary_output)
+    {
+        albedo_pixels.resize(m_image_width * m_image_height * image_bpp);
+        float* albedo_ptr = reinterpret_cast<float*>(albedo_pixels.data());
+        float* albedo_diffuse_ptr = reinterpret_cast<float*>(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_DIFFUSE].data());
+        float* albedo_glossy_ptr = reinterpret_cast<float*>(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_GLOSSY].data());
+        for (size_t i = 0; i < albedo_pixels.size() / sizeof(float); i++)
+            albedo_ptr[i] = albedo_diffuse_ptr[i] + albedo_glossy_ptr[i];
+    }
 
     std::string filename_base = m_options.output_file;
     std::string filename_ext;
@@ -2008,11 +2026,14 @@ void Df_vulkan_app::write_accum_images_to_files()
     }
 
     export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_BEAUTY], filename_base + filename_ext);
-    export_pixels_rgba32f(albedo_pixels, filename_base + "_albedo" + filename_ext);
-    export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_DIFFUSE], filename_base + "_albedo_diffuse" + filename_ext);
-    export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_GLOSSY], filename_base + "_albedo_glossy" + filename_ext);
-    export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_NORMAL], filename_base + "_normal" + filename_ext);
-    export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ROUGHNESS], filename_base + "_roughness" + filename_ext);
+    if (m_options.enable_auxiliary_output)
+    {
+        export_pixels_rgba32f(albedo_pixels, filename_base + "_albedo" + filename_ext);
+        export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_DIFFUSE], filename_base + "_albedo_diffuse" + filename_ext);
+        export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ALBEDO_GLOSSY], filename_base + "_albedo_glossy" + filename_ext);
+        export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_NORMAL], filename_base + "_normal" + filename_ext);
+        export_pixels_rgba32f(image_pixels[ACCUM_IMAGE_AUX_ROUGHNESS], filename_base + "_roughness" + filename_ext);
+    }
 }
 
 
@@ -2121,7 +2142,8 @@ const mi::neuraylib::ITarget_code* generate_glsl_code(
     check_success(be_glsl->set_option("num_texture_spaces", "1") == 0);
     check_success(be_glsl->set_option("num_texture_results",
         std::to_string(options.tex_results_cache_size).c_str()) == 0);
-    check_success(be_glsl->set_option("enable_auxiliary", "on") == 0);
+    check_success(be_glsl->set_option("enable_auxiliary",
+        options.enable_auxiliary_output ? "on" : "off") == 0);
     check_success(be_glsl->set_option("df_handle_slot_mode", "none") == 0);
     check_success(be_glsl->set_option("libbsdf_flags_in_bsdf_data",
         options.enable_bsdf_flags ? "on" : "off") == 0);
@@ -2346,6 +2368,7 @@ void print_usage(char const* prog_name)
         << "  --background <r> <g> <b>    constant background color to replace the environment only \n"
         << "                              if directly visible to the camera. (default: <empty>).\n"
         << "  --nocc                      don't compile the material using class compilation\n"
+        << "  --noaux                     don't generate code for albedo and normal buffers\n"
         << "  --tex_res <num>             size of the texture results cache\n"
         << "  --enable_ro_segment         enable the read-only data segment\n"
         << "  --disable_ssbo              disable use of an ssbo for constants\n"
@@ -2497,6 +2520,8 @@ void parse_command_line(
 #endif // MDL_ENABLE_MATERIALX
             else if (arg == "--nocc")
                 options.use_class_compilation = false;
+            else if (arg == "--noaux")
+                options.enable_auxiliary_output = false;
             else if (arg == "--tex_res" && i < argc - 1)
                 options.tex_results_cache_size = uint32_t(std::atoi(argv[++i]));
             else if (arg == "--enable_ro_segment")
@@ -2598,7 +2623,8 @@ int MAIN_UTF8(int argc, char* argv[])
     if (!options.nostdpath)
     {
         std::string mdl_search_path_for_materialx_support
-            = mi::examples::io::get_executable_folder() + "/materialx/mdl";
+            = mi::examples::mdl::find_resource_directory(
+                MDL_EXAMPLE_RELATIVE_DIRECTORY, "materialx/mdl");
         configure_options.additional_mdl_paths.push_back(mdl_search_path_for_materialx_support);
     }
     for (const auto& path: options.mtlx_paths)
@@ -2651,7 +2677,7 @@ int MAIN_UTF8(int argc, char* argv[])
             if (options.material_name.find(".mtlx") != std::string::npos)
             {
                 // Set up MDL generator
-                mi::examples::materialx::Mdl_generator generator;
+                mi::examples::materialx::Mdl_generator generator(MDL_EXAMPLE_RELATIVE_DIRECTORY);
                 generator.set_mdl_version(options.mtlx_to_mdl_target_version);
                 generator.set_materialxtest_mode(options.materialxtest_mode);
                 for (const auto& p : options.mtlx_paths)
@@ -2676,9 +2702,17 @@ int MAIN_UTF8(int argc, char* argv[])
                     exit_failure();
                 }
 
+                const std::string& code = generated.generated_mdl_code;
+                if (!options.dump_mdl.empty())
+                {
+                    print_message(mi::base::MESSAGE_SEVERITY_INFO,
+                        "Dumping generated MDL module to: " + options.dump_mdl);
+                    std::ofstream file_stream(options.dump_mdl);
+                    file_stream.write(code.c_str(), code.length());
+                }
+
                 qualified_module_name = "::app::generated";
                 material_simple_name = generated.generated_mdl_name;
-                const std::string& code = generated.generated_mdl_code;
                 if (mdl_impexp_api->load_module_from_string(
                     transaction.get(), qualified_module_name.c_str(), code.c_str(), context.get()) < 0)
                 {
@@ -2686,14 +2720,6 @@ int MAIN_UTF8(int argc, char* argv[])
                         "Failed to load the generated MDL code from: " + options.material_name);
                     print_messages(context.get());
                     exit_failure();
-                }
-
-                if (!options.dump_mdl.empty())
-                {
-                    print_message(mi::base::MESSAGE_SEVERITY_INFO,
-                        "Dumping generated MDL module to: " + options.dump_mdl);
-                    std::ofstream file_stream(options.dump_mdl);
-                    file_stream.write(code.c_str(), code.length());
                 }
             }
             else

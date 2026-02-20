@@ -3099,9 +3099,30 @@ DAG_node const *DAG_node_factory_impl::create_call(
         case IDefinition::DS_INTRINSIC_MATH_CLAMP:
             MDL_ASSERT(num_call_args == 3);
             if (call_args[1].arg == call_args[2].arg) {
-                // clamp(x, min, min) => min if x is finite
+                // clamp(x, min, min) => T(min) if x is finite and T = typeof(x)
                 if (m_unsafe_math_opt || is_finite(call_args[0].arg)) {
-                    return call_args[1].arg;
+                    IType const *arg0_tp = call_args[0].arg->get_type()->skip_type_alias();
+                    IType const *arg1_tp = call_args[1].arg->get_type()->skip_type_alias();
+                    DAG_node const *res = call_args[1].arg;
+
+                    if (arg0_tp == arg1_tp) {
+                        return res;
+                    } else {
+                        // convert to arg0_tp
+                        DAG_call::Call_argument c_call_args[1];
+
+                        c_call_args[0].arg = res;
+                        c_call_args[0].param_name = "value";
+
+                        string name = DAG_mangler(get_allocator()).mangle_conversion(arg0_tp, arg1_tp);
+                        return create_constructor_call(
+                            name.c_str(),
+                            IDefinition::DS_CONV_CONSTRUCTOR,
+                            c_call_args,
+                            1,
+                            arg0_tp,
+                            dbg_info);
+                    }
                 }
             }
             break;

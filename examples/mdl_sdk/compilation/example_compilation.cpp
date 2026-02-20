@@ -342,7 +342,7 @@ void usage( char const *prog_name)
         << "Options:\n"
         << "  --mdl_path <path>   mdl search path, can occur multiple times.\n"
         << "  --expr_path         expression path to compile, defaults to "
-           "\"backface.scattering.tint\"."
+           "\"backface.scattering.tint\".\n"
         << "  <material_name>     qualified name of materials to use, defaults to\n"
         << "                      \"::nvidia::sdk_examples::tutorials::example_compilation\"\n"
         << std::endl;

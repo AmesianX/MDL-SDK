@@ -119,6 +119,11 @@ public:
     /// Clone a qualified name.
     IQualified_name *clone_name(IQualified_name const *qname) MDL_FINAL;
 
+    /// Adapt the position file name if necessary.
+    ///
+    /// \param expr  the expression whose position must be adapted
+    void adapt_position_owner(IExpression *expr) MDL_FINAL;
+
     /// Compute the promotions rules when a call (represented by a definition) will be
     /// promoted from one MDL version to a target version.
     ///

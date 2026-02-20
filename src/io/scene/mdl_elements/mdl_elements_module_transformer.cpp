@@ -310,6 +310,8 @@ private:
     { return const_cast<mi::mdl::IExpression_literal*>( lit); }
     mi::mdl::IQualified_name* clone_name( const mi::mdl::IQualified_name* qname) final
     { return const_cast<mi::mdl::IQualified_name*>( qname); }
+    void adapt_position_owner(mi::mdl::IExpression*) final
+    { /* do nothing */ }
 
     mi::mdl::IMDL* m_mdl;
 
@@ -406,6 +408,8 @@ private:
     { return const_cast<mi::mdl::IExpression_literal*>( lit); }
     mi::mdl::IQualified_name* clone_name( const mi::mdl::IQualified_name* qname) final
     { return const_cast<mi::mdl::IQualified_name*>( qname); }
+    void adapt_position_owner(mi::mdl::IExpression*) final
+    { /* do nothing */ }
 
     /// Returns a qualified name where the last component has been removed.
     mi::mdl::IQualified_name* strip_last_component( mi::mdl::IQualified_name* name);

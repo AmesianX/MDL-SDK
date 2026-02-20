@@ -1058,12 +1058,23 @@ bool Root_signature::finalize()
 
 // ------------------------------------------------------------------------------------------------
 
-ID3D12RootSignature* Root_signature::get_signature()
+const ID3D12RootSignature* Root_signature::get_signature() const
 {
     if (!m_is_finalized)
     {
         log_warning("Root signature '" + m_debug_name +
                     "' is not finalized. The signature not yet available.", SRC);
+        return nullptr;
+    }
+    return m_root_signature.Get();
+}
+
+ID3D12RootSignature* Root_signature::get_signature()
+{
+    if (!m_is_finalized)
+    {
+        log_warning("Root signature '" + m_debug_name +
+            "' is not finalized. The signature not yet available.", SRC);
         return nullptr;
     }
     return m_root_signature.Get();

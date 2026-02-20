@@ -103,11 +103,12 @@ public:
     /// \return
     ///                    -  0: Success
     ///                    - -1: Unspecified failure.
+    ///                    \ifnot MDL_SDK_API
     ///                    - -2: Authentication failure (challenge-response).
     ///                    - -4: Provided license expired.
     ///                    - -5: No professional GPU as required by the license in use was found.
-    ///                    (historical - -6: Authentication failure (FLEXlm).)
     ///                    - -7: No NVIDIA VCA as required by the license in use was found.
+    ///                    \endif
     virtual Sint32 start( bool blocking = true) = 0;
 
     /// The operational status of the library \if DICE_API or additional clusters \endif

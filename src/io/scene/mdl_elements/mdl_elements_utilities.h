@@ -678,6 +678,18 @@ mi::neuraylib::Mdl_version get_min_required_mdl_version(
 mi::neuraylib::Mdl_version get_min_required_mdl_version(
     DB::Transaction* transaction, const IExpression* expr);
 
+/// Returns the minimal required MDL version for a given type.
+///
+/// Returns mi::mdl::IMDL::MDL_VERSION_1_0 for \c nullptr arguments.
+mi::neuraylib::Mdl_version get_min_required_mdl_version(
+    DB::Transaction* transaction, const IType* type);
+
+/// Returns the minimal required MDL version for a given type list.
+///
+/// Returns mi::mdl::IMDL::MDL_VERSION_1_0 for \c nullptr arguments.
+mi::neuraylib::Mdl_version get_min_required_mdl_version(
+    DB::Transaction* transaction, const IType_list* type_list);
+
 /// Returns the minimal required MDL version for a given expression list.
 ///
 /// Returns mi::mdl::IMDL::MDL_VERSION_1_0 for \c nullptr arguments.

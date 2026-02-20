@@ -1,6 +1,68 @@
 Change Log
 ==========
 
+MDL SDK 2025.0.5 (387700.3418): 20 Feb 2026
+-----------------------------------------------
+
+ABI compatible with the MDL SDK 2025.0.5 (387700.3418) binary release
+(see [https://developer.nvidia.com/mdl-sdk](https://developer.nvidia.com/mdl-sdk))
+
+**Added and Changed Features**
+
+- General
+  - The recommended vcpkg version has been updated to git ID 5fac54d. This update includes Boost
+    1.90.0, Vulkan SDK 1.4.328.0, and various security fixes for dependencies.
+  - Added new API component `IScheduling_configuration`, mostly to control load limits when using
+    the CPU baker.
+
+- MDL Compiler and Backends
+  - Added a simple cache that reduces calls to the (potentially slow) entity resolver.
+
+- MDL SDK examples
+  - Example df_vulkan:
+    - Added a `--noaux` option to avoid code generation, execution, and export
+      operation for the auxiliary buffers.
+  - Example DXR
+    - Use D3D12 shader collections to improve compile time performance.
+
+**Fixed Bugs**
+
+- General
+  - Fixed hair BSDF code not callable for native backend. The `Target_code::execute_bsdf_*`
+    functions can now also be used for hair BSDFs.
+  - Fixed rare cases where the module builder computed a too low minimal MDL version.
+
+- MDL Compiler and Backends
+  - Fixed missing adapt_normal function pointer in `Texture_handler_vtable`.
+  - Fixed some error messages reference wrong source code locations.
+  - Do not fold casts of `+/-inf and `NaN` to `int`. Create an error when used inside a const
+    expression.
+  - Fixed a crash in the native backend under Windows that is caused by function with big stack
+    frames because the `__chkstk` symbol was missing.
+  - Fixed a crash when optimizing `clamp(x, min, min)` if `typeof(x) != typeof(min)`.
+
+- MDL Core examples
+  - Example df_vulkan:
+    - Fixed validation errors regarding semaphore reuse.
+
+- MDL SDK examples
+  - Examples Shared:
+    - Improved parameter editor to better support long parameter names.
+
+  - Example DXR and df_vulkan:
+    - Fixed translation of the targeted MDL version based on the MaterialX version.
+
+  - Example df_vulkan:
+    - Fixed install target for MaterialX content.
+    - Fixed detection of MaterialX content when the vcpkg layout is used.
+    - Dump MDL content generated from MaterialX input before attempting to load it.
+    - Fixed rendering artefacts for materials with volumes.
+    - Fixed validation errors regarding semaphore reuse.
+
+  - Example DXR:
+    - Use D3D12 shader collections to improve compile time performance.
+    - Filtered non-float vertex data from glTF models as those are not supported at this point.
+
 MDL SDK 2025.0.3 (387700.2665): 10 Dec 2025
 -----------------------------------------------
 
@@ -11,29 +73,29 @@ ABI compatible with the MDL SDK 2025.0.3 (387700.2665) binary release
 
 - General
   - Improved database garbage collection such that transactions in unrelated scopes
-	do not prevent a cleanup.
-	
+    do not prevent a cleanup.
+
   - The recommended vcpkg version has been updated to git ID 30d7c16. This
     update includes Boost 1.89.0, OpenImageIO 3.0.9.1, Vulkan SDK 1.4.309.0, and
     various security fixes in their dependencies.
-	
+
   - The recommended MaterialX version has been updated to 1.39.4.
-	
+
   - Reduced compiler warnings on Windows.
-	
+
 - MDL Compiler and Backends
   - Added compilation-context option "rerun_inlining" (off by default) to re-run inlining
     at material compilation time. This might be beneficial in instance compilation mode to
-	inline (and fold) much more code, so analysis on code structure will find more properties.
+    inline (and fold) much more code, so analysis on code structure will find more properties.
 
-- MDL SDK examples	
+- MDL SDK examples
   - Multiple examples:
     - Harmonized the name of some command-line options ("`--camera`" instead of
       "`--cam`", "`--no_window`" instead of "`--nogl`", "`--nogui`", or "`--nowin`").
     - Renamed environment variable `MDL_SAMPLES_ROOT` to `MDL_EXAMPLES_ROOT`.
     - Added support for moving example binaries within the install directory,
       e.g., to support the vcpkg layout.
-  
+
   - Example df_vulkan:
     - Added focal point to "`--camera`" command-line option.
     - Added "`--fatal`", "`--error`", etc. command-line options to control the verbosity.
@@ -41,37 +103,37 @@ ABI compatible with the MDL SDK 2025.0.3 (387700.2665) binary release
     - Added support to use df_vulkan as test renderer for the MDL backend in MaterialX.
     - Use the image export option "`force_default_gamma`" for easier comparison
       with other backends in MaterialX.
-  
+
   - Example DXR:
     - Added options to disable default MDL and MaterialX search paths for improving the export
-	  of generated MDL from MaterialX for debugging purposes.
+      of generated MDL from MaterialX for debugging purposes.
     - The example now uses the static MSVC runtime (as all other examples). As
       a consequence, the pre-built MaterialX libraries from their homepage are
       no longer directly suitable. See also the documentation of the CMake
       variable `MDL_MSVC_DYNAMIC_RUNTIME`.
     - Dropped "`autodesk_`" prefix from build/install location for MaterialX support files.
     - Replaced command-line options "`-g`" and "`--generated`" by "`--dump_mdl`".
-  
+
   - Example distilling_unity:
     - Replaced command-line option "`--verbosity`" by "`--fatal`", "`--error`", etc.
-	
-**Fixed Bugs**	
+
+**Fixed Bugs**
 
 - General
   - Fixed a problem when Ninja is used as CMake generator on Windows.
-  
+
   - Removed a few calls to `strlen()` to please static scanners.
-  
+
 - MDL Compiler and Backends
   - Fixed position of token for qualified names starting with "{\tt ::}" and prefix operators
     taken from the second token. This could lead to wrong error lines if for instance
-	the "{\tt ++}" operator and its operand are on different lines.
-	
+    the "{\tt ++}" operator and its operand are on different lines.
+
 - MDL SDK examples
   - Example DXR:
     - Fixed endless loop for existing files when using "`--mdl_dump`".
-	  File names don't get an increasing suffix anymore.
-	  
+      File names don't get an increasing suffix anymore.
+
 - MDL Distiller and Baker
   - Improved distilling of OpenPBR materials with metalness = 1.
 
@@ -85,7 +147,7 @@ ABI compatible with the MDL SDK 2025.0.0 (387700.1252) binary release
 
 - General
   - Added template wrapper for `ICompiled_material::lookup_sub_expression()`.
-  
+
   - Releases on github include now archives with pre-built binaries. Note that not all features are
     enabled in these builds. For now, MaterialX support, the Arnold plugin, the AxF example, and
     the material browser example are not available.
@@ -165,14 +227,14 @@ ABI compatible with the MDL SDK 2025.0.0 (387700.1252) binary release
   - Fixed a crash that occurred because a partial structure update
     did not generate all struct field access functions, although these are necessary in
     the DAG representation.
-  
+
   - Fixed several auto-import problems, for instance caused by default arguments of struct
     elemental constructor. As a consequence, it is now always an "internal error" if the compiler
     was not able to do the auto-import, not only an assertion in debug builds.
 
   - Fixed declarative property of struct constructors, the declarative property of struct
     constructors must be inherited  from the struct type definition.
-	
+
 MDL SDK 2024.1.6 (381500.7597): 22 Sep 2025
 -----------------------------------------------
 
@@ -180,10 +242,10 @@ ABI compatible with the MDL SDK 2024.1.6 (381500.7597) binary release
 (see [https://developer.nvidia.com/mdl-sdk](https://developer.nvidia.com/mdl-sdk))
 
 **Fixed Bugs**
-		  
+
 - General
-	- Removed unused package.json files which can cause false positives
-	  with some security scanners.
+  - Removed unused package.json files which can cause false positives
+    with some security scanners.
 
 - MDL Compiler and Backends
   - Fixed a crash in the compiler that occurred during the type construction if the error
@@ -192,7 +254,7 @@ ABI compatible with the MDL SDK 2024.1.6 (381500.7597) binary release
   - Fixed a crash that occurred because a partial structure update
     did not generate all struct field access functions, although these are necessary in
     the DAG representation.
-	
+
 
 MDL SDK 2024.1.4 (381500.6583): 01 Jul 2025
 -----------------------------------------------
@@ -226,9 +288,9 @@ ABI compatible with the MDL SDK 2024.1.3 (381500.5658) binary release
     - Added new dependency_inspector example:
         - It lists all file dependencies of an MDL module for direct and (optionally) indirect
           imports and resources.
-		  
+
 **Fixed Bugs**
-		  
+
 - General
 	- Fixed warnings/errors with newer compilers (GCC 15 beta).
 	- Fixed embedded RC files on Windows.
@@ -237,16 +299,16 @@ ABI compatible with the MDL SDK 2024.1.3 (381500.5658) binary release
 	- Fixed code generation for switch statements that could result in compilation
 	  failure in rare cases.
 	- Fixed generation of array compound assignments outside of declarations for HLSL.
-	
+
 - MDL Distiller and Baker
 	- Fixed distilling bug in the anisotropy rotation remapping causing anisotropy angles
 	  to be flipped.
-	
+
 - MDL Core examples
 	- Example codegen:
 		- Fixed example on Windows such that after installation it loads the distiller plugin
 		  without depending on PATH.
-		  
+
 - MDL SDK examples
 	- Example modules:
 		- Fixed wrong executable name in command line help description.
@@ -290,18 +352,18 @@ ABI compatible with the MDL SDK 2024.1.1 (381500.4681) binary release
       import libraries on Windows will be removed. Users should access the MDL
       Core/SDK library using `LoadLibrary()`/`GetProcAddress()` or `dlopen()`/`dlsym()`
       instead (as it is done in all examples). Cmake users should use:
-      
+
         `get_target_property(SOME_VAR mdl::mdl_sdk INTERFACE_INCLUDE_DIRECTORIES)`
         `target_include_directories(your_target PRIVATE ${SOME_VAR})`
 
-      (similarly for `mdl::mdl_core`).  
+      (similarly for `mdl::mdl_core`).
     - Added the linker option `--strip-all/-x` for release builds on Linux/MacOS.
-    
+
 - MDL Compiler and Backends
     - The compiler now obeys the `target_material_model` annotation when used on material
       presets. This allows to make a target material from a preset, even if the original material
       is not. This implements user expectations.
-      
+
 - MDL SDK examples
     - Added new dependency_inspector example:
         - It lists all file dependencies of an MDL module for direct and (optionally) indirect
@@ -310,7 +372,7 @@ ABI compatible with the MDL SDK 2024.1.1 (381500.4681) binary release
         - Completely refactored this example that now extends its functionality.
         - Added options to set MDL search paths and load/scan user selected modules.
         - Added filter option to select which information to output from a module: imports,
-          types and constants definitions, function and material definitions, resources. 
+          types and constants definitions, function and material definitions, resources.
         - Added option to scan indirect dependencies and resources from imported modules.
         - Added option to display the default values, temporaries and body of selected function
           and material definitions.
@@ -322,17 +384,17 @@ ABI compatible with the MDL SDK 2024.1.1 (381500.4681) binary release
           "`--cam_exposure`".
         - Added support for subsurface scattering by implementing the Henyey-Greenstein
           phase function.
-        - Added option to control the subsurface scattering path length: "`--max_sss_steps`".  
+        - Added option to control the subsurface scattering path length: "`--max_sss_steps`".
     - Third-party dependencies:
         - Disabled XInput support in the ImGui compilation.
-        
+
 - MDL Core examples
     - Shared:
         - Added new `Distiller_helper` helper class. It simplifies the context creation and
           procedure required for distilling an MDL material using Core API.
     - Example code_gen:
         - Added option to distill an MDL material to a given material target model.
-                
+
 **Fixed Bugs**
 
 - MDL 1.10 Language Specification
@@ -372,7 +434,7 @@ ABI compatible with the MDL SDK 2024.1.1 (381500.4681) binary release
     - Fixed memory leaks in MDL examples.
     - Fixed `trace_shadow` function executing a generated MDL function potentially requiring
       texture results without providing them.
-              
+
 MDL SDK 2024.1.0 (381500.2959): 14 Jan 2025
 -----------------------------------------------
 
@@ -391,7 +453,7 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
     - Added standard distribution function modifier `microflake_sheen_bsdf`.
     - Added standard distribution function modifier `coat_absorption_factor`.
     - Extended rules for the distribution function normal form with new BSDFs.
-        
+
 - General
     - Added `IBaker::get_type_name()` to obtain the type name for constants to be used
       for a given baker instance. Improved the baker documentation w.r.t. the relation between
@@ -420,10 +482,10 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
     - Python Bindings:
         - Added `get_data_numpy()` to access texture tile data with numpy.
         - Renamed internal binding functions to start with an underscore.
-        - Added type annotations to structure fields.    
+        - Added type annotations to structure fields.
         - Updated to Swig to version 4.2.1.
         - Added binding for new `IBaker::bake_texture_with_constant_detection` function.
-        
+
 - MDL Compiler and Backends
     - Added support for MDL 1.10.
     - Added expression promotion for default arguments of imported entities: Before this release,
@@ -439,7 +501,7 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
           older version, because there is not always a downgrade path.
         - Note further that this is supported for all MDL versions, not only MDL 1.10 now, so
           exports can create code that is not accepted by older versions of the MDL SDK/compiler.
-          
+
 - MDL Distilling and Baker
     - Added support for baking `float2` and `float4` expressions.
     - Increased the number of texture spaces supported to 16.
@@ -447,7 +509,7 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
     - Both, CPU and GPU bakers, implement a new method
       `IBaker::bake_texture_with_constant_detection()`. This method is an improved version of
       `bake_texture()` that detects constant textures.
-      
+
 - MDL SDK examples
     - Third-party dependencies:
         - Updated `ImGui` to version 1.95.5.
@@ -494,7 +556,7 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
       and how to generate target code for the native backend.
     - Added new Core API example "df_vulkan" for demonstrating generation and usage of
       distribution functions using the GLSL backend in a Vulkan-based path tracer.
-      
+
 **Fixed Bugs**
 
 - General
@@ -516,7 +578,7 @@ ABI compatible with the MDL SDK 2024.1.0 (381500.2959) binary release
       variant itself, not to its prototype.
     - Fixed names of some unit test targets to support the cmake generator for Ninja.
     - Fixed documentation for the `::base` and `::nvidia::core_definitions` modules to match
-      exactly the version of those modules.  
+      exactly the version of those modules.
 
 - MDL Compiler and Backends
     - Skip transmission check for thin-walled materials in target material mode, because the
@@ -560,7 +622,7 @@ ABI compatible with the MDL SDK 2024.0.4 (377400.3959) binary release
 - General
     - The default value for the backend option `enable_exceptions` is now `off`,
       as this is the behavior described by the MDL specification.
-      
+
 - MDL Compiler and Backends
     - Implemented folding of `::tex` function calls with invalid textures on the DAG.
     - Added “`max_const_data`” backend option to limit the size of global constants in the
@@ -591,7 +653,7 @@ ABI compatible with the MDL SDK 2024.0.4 (377400.3959) binary release
     - Fixed a build error caused by picking up LLVM header files from a different location.
     - Fixed documented return codes for `IExpression_factory::create_cast()` and
       `create_decl_cast()` (error codes are negative as usual, not positive).
-    - Fixed missing build dependencies for the distiller plugins and the distiller example plugin.    
+    - Fixed missing build dependencies for the distiller plugins and the distiller example plugin.
 
 - MDL Compiler and Backends
     - Allow material sub structs to be used inside a declarative struct and declarative functions.
@@ -734,7 +796,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
         methods on `IModule_builder` has been extended with a
         `is_declarative` parameter. The old signatures are still available if
         `MI_NEURAYLIB_DEPRECATED_15_0` is defined.
-          
+
   - The methods for texture export (`IMdl_impexp_api::export_canvas()` and
     `IImage_api::create_buffer_from_canvas()`) and the image plugin API have
     been changed to use a generic options map instead of two hard-coded options.
@@ -768,14 +830,14 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
     Core is now installed as part of the "install" target.
   - Added the compiler flag `-flax-vector-conversions` when
     using OpenImageIO on Linux and ARM.
-    
+
   - Python Bindings:
     - Changed the recommended Python version to 3.10.
     - Improved type hints.
     - Added stub functions to keep the bindings backwards compatible.
     - Prepared for an update to Swig 4.2.1.
     - Added more tests to improve coverage.
-        
+
 - MDL Compiler and Backends
   - Increased default MDL version to 1.9.
   - Added support for MDL 1.9:
@@ -788,7 +850,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
        calculate reflections, transmissions or both.
   - MDL Core API: Support for declarative structs and functions (AOV support).
     - Extend the abstract syntax of MDL
-      - New declaration kind `mi::mdl::IDeclaration::Kind::DK_STRUCT_CATEGORY` and corresponding 
+      - New declaration kind `mi::mdl::IDeclaration::Kind::DK_STRUCT_CATEGORY` and corresponding
         class `mi::mdl::IDeclaration_struct_category` for struct category declarations.
       - New methods on `mi::mdl::IDeclaration_type_struct` for modifying a struct's category:
         - `IQualified_name const *get_struct_category_name()`.
@@ -829,7 +891,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
       - New type `mi::mdl::IStruct_category` to reference struct categories in struct types.
       - New method `IStruct_category const *mi::mdl::IType_struct::get_struct_category()`.
       - New method `mi::mdl::IType_factory::create_struct_category()` to create struct
-        category objects.        
+        category objects.
   - MDL Core API: Others
     - Change representation of enums and structs to immutable types:
       - `mi::mdl::IType_enum::get_value()` and `lookup()` methods have changed to return
@@ -842,8 +904,8 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
     - Moved the `mi::mdl::IMaterial_instance interface` out of `mi::mdl::IGenerated_code_dag`.
     - Use size_t for MDL AST statement, expression and definition counts/indexes.
     - Make distilling available to users of `ibmdl_core`.
-    
-- MDL Distiller and Baker    
+
+- MDL Distiller and Baker
   - Extend distiller node types to include 4-way mixers.
   - The class `mi::neuraylib::IBaker` has been extended to support setting UV ranges.
 
@@ -876,7 +938,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
     - Improved the selection of MDL expressions to generate shader code for.
     - Switched MaterialX SDK to 1.38.9.
     - Added CAMERA_POSITION scene data for a prototype implementation of MaterialX NPR nodes.
-    
+
 **Fixed Bugs**
 
 - General
@@ -886,7 +948,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
     properly recognize `uvtile` sequences with a single tile.
   - Fixed support for search paths from "`MDL_SYSTEM_PATH`" and "`MDL_USER_PATH`"
     environment variables containing Unicode characters on Windows.
-    
+
 - MDL Compiler and Backends
   - The MDL core compiler did not compute correctly the uniform/varying property of
     single expression body functions, causing these to be always treated as uniform.
@@ -946,7 +1008,7 @@ ABI compatible with the MDL SDK 2024.0.1 (377400.2109) binary release
     - Fixed usage information. The example expects a module as input, not a material.
   - MDL Example DXR:
     Fixed glTF interaction between volume attenuation and single sided materials.
-    
+
 
 MDL SDK 2023.1.4 (373000.3036): 18 Mar 2024
 -----------------------------------------------
@@ -959,7 +1021,7 @@ ABI compatible with the MDL SDK 2023.1.4 (373000.3036) binary release
 
 - General
     - Added a linker script on Linux that hides all defined symbols except for the factory symbol(s).
-    
+
 - MDL SDK examples
     - Updated OptiX 7 example to support up to OptiX SDK 8.0.0.
     - Example AXF to MDL
@@ -967,18 +1029,18 @@ ABI compatible with the MDL SDK 2023.1.4 (373000.3036) binary release
         - Improved compatibility for refracting carpaint representation.
         - Improved mapping of Cook-Torrance spreads (used for non-measured BRDF fallback
           and flake orientation).
-    - Example Execution GLSL: 
+    - Example Execution GLSL:
         - Added enable/disable SSBO and noise function remap by command line arguments.
 
 **Fixed Bugs**
 
 - General
-    - Fixed a crash if `IMdl_resolved_resource_element::create_reader()` returns `nullptr`. 
+    - Fixed a crash if `IMdl_resolved_resource_element::create_reader()` returns `nullptr`.
       This might be due to an incorrect user implementation, or in legitimate cases, e.g.,
       if the file disappeared between resolving and the query.
     - Fixed a memory leak involving the interface pointer used with the context option
       "user_data".
-      
+
 - MDL Compiler and Backends
     - Fixed inconsistent storing and reading of matrix material parameters in target
       argument blocks for the native backend.
@@ -998,7 +1060,7 @@ ABI compatible with the MDL SDK 2023.1.4 (373000.3036) binary release
         - Fixed command line options to match other examples for `--mdl_path` / `-p` option.
     - Example AXF to MDL
         - Fixed re-coding of BRDF colors table (used in non-measured BRDF fallback).
-    - Example Execution GLSL: 
+    - Example Execution GLSL:
         - Fixed OpenGL 3.3 mode.
 
 MDL SDK 2023.1.3 (373000.2208): 14 Feb 2024
@@ -1046,7 +1108,7 @@ ABI compatible with the MDL SDK 2023.1.2 (373000.1755) binary release
 **Added and Changed Features**
 
 - General
-    - libbsdf: 
+    - libbsdf:
         - The roughness values computed by the generated auxiliary functions changed to contain
           only glossy contributions.
         - The color weights for normals and roughness in the generated auxiliary functions
@@ -1059,7 +1121,7 @@ ABI compatible with the MDL SDK 2023.1.2 (373000.1755) binary release
       providing those arrays as function parameters. This especially improves rendering
       performance of `axf_importer` materials.
     - Avoid array copies when accessing arrays provided as function parameters for HLSL/GLSL.
-    
+
 - MDL SDK examples
     - Add options to configure the lambda return mode and the generation of PDF and auxiliary
       functions to code_gen example.
@@ -1071,8 +1133,8 @@ ABI compatible with the MDL SDK 2023.1.2 (373000.1755) binary release
 - General
     - `nvidia::core_definitions`: Fixed `'--'` in display names.
     - Fixed type computation of ternary operator.
-    
-- MDL Compiler and Backends    
+
+- MDL Compiler and Backends
     - Fixed a rare crash that could happen in an MDL module imports other modules and
       import the same module (diamond pattern).
     - Fixed default constructor of enum values which sometimes did not choose
@@ -1148,7 +1210,7 @@ ABI compatible with the MDL SDK 2023.1.0 (373000.1077) binary release
         - Added missing and fixed existing `get/set_value` functions for various `IData` class bindings.
         - Mapping now `mi::Size` to `Sint64` to handle `-1` returns correctly.
         - Removed the `IAttribute_set` function from scene elements.
-      
+
 - MDL Compiler and Backends
     - Removed unused `exception_state` parameter from generated functions for non-native backends
       to improve performance. Needs update in renderers calling these functions.
@@ -1156,7 +1218,7 @@ ABI compatible with the MDL SDK 2023.1.0 (373000.1077) binary release
       their values directly instead via a result buffer by setting the new backend option
       `"lambda_return_mode"` to `"value"`. Only supported by the PTX and the LLVM-IR backend.
     - Generated auxiliary functions now separate albedo into diffuse and glossy, similar to the evaluate functions.
-    - Generated auxiliary functions now also report roughness.  
+    - Generated auxiliary functions now also report roughness.
 
 - MDL Distiller and Baker
     - Debugging features for mdltlc: `debug_name` and `debug_print` statements
@@ -1207,17 +1269,17 @@ ABI compatible with the MDL SDK 2023.1.0 (373000.1077) binary release
     - Fixed `texremapu` in `base.mdl` for GLSL resulting in undefined behavior
       for negative texture coordinates.
     - Improved handling of invalid MDL code in the MDL compiler.
-    
+
 - MDL Distiller and Baker
     - Fixed printing of `NaN`, `+inf` and `-inf` constants in the `mdl_distiller_cli`
       command line utility. They are now printed as `(0.0/0.0)`, `(1.0/0.0)` and `(-1.0/0.0)`
       respectively, same as in the MDL compiler and SL backends.
     - mdltlc: Fixed code generation for rules with node names.
     - mdltlc: Fixed code generation for creation of conditional expressions.
-    
+
 - MDL SDK examples
     - Example DXR: Fixed resource creation warnings reported with the
-      `"--gpu-debug"` option on Windows 11.    
+      `"--gpu-debug"` option on Windows 11.
 
 MDL SDK 2023.0.6 (367100.5773): 03 Nov 2023
 -----------------------------------------------
@@ -1239,24 +1301,24 @@ ABI compatible with the MDL SDK 2023.0.6 (367100.5773) binary release
     - Optimized high-level (GLSL/HLSL) code generator to reduce code size.
     - Added new backend option "`hlsl_remap_functions`": This allows to remap MDL functions
       (including state functions) to user implemented  Native HLSL implementations.
-    
+
 - MDL Distiller and Baker
     - Renamed `mdl_distiller` command line tool to `mdl_distiller_cli` to more
       clearly separate it from the distiller plugin of the same name.
-      
+
 **Fixed Bugs**
 
 - General
     - Fixed `IFactory::compare()` for `IString` and `IRef` on Linux on ARM.
     - Python Bindings:
-        - Fixed the binding for the `ITile::get_pixel()` and 
+        - Fixed the binding for the `ITile::get_pixel()` and
           `ITile::set_pixel()` functions.
         - Mapped `mi::Size` to `signed integer` in python to allow for
           comparing against `-1`.
         - Deprecated the tuple return of functions that have an `float*` out parameter in C++.
           Now an `ReturnCode` object is passed in and out as Python parameter.
         - Removed unused classes and functions from the bindings.
-    
+
 - MDL Distiller and Baker
     - mdltlc: Fixed matching on nested attribute expressions.
     - Fixed missing `enum` to `int` conversion operator an auto-imports,
@@ -1313,7 +1375,7 @@ ABI compatible with the MDL SDK 2023.0.4 (367100.4957) binary release
       This makes the generated arguments more "deterministic" for users.
     - Fixed export of uv-tile textures. Only first tile was exported.
     - Fixed export of animated textures when frame number differs from frame ID.
-        
+
 - MDL Compiler and Backends
     - Fixed translation of vector access with non-constant index in some cases for HLSL/GLSL.
     - Fixed bit-operations on integer fields in structs containing derivable values.
@@ -1377,7 +1439,7 @@ ABI compatible with the MDL SDK 2023.0.2 (367100.3997) binary release
     - Fixed the necessary precision to print floats and doubles so it can read back
       without losses.
     - Fixed missing elemental constructor for locally defined structs in the DAG- representation.
-    - Fixed compiler crashes for: 
+    - Fixed compiler crashes for:
         - Invalid call expressions.
         - Invalid array types with a let expression as the array size.
     - Compiler now reports proper errors when a function is returned from a function.

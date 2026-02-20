@@ -800,6 +800,12 @@ Mdl_texture_set* Mdl_material_library::access_texture_resource(
                 canvas = m_sdk->get_image_api().convert(canvas.get(), "Color");
             }
 
+            if (set.entries.size() <= global_tile_id)
+            {
+                log_error("Exceeded texture set: " + db_name, SRC);
+                return nullptr;
+            }
+
             Texture* texture_resource = static_cast<Texture*>(set.entries[global_tile_id].resource);
 
             size_t tex_width = texture_resource->get_width();
